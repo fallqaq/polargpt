@@ -1,0 +1,38 @@
+{
+  "name": "polargpt",
+  "type": "module",
+  "private": true,
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": "24.x",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "deploy:check": "node scripts/check-deploy-readiness.mjs",
+    "generate": "nuxt generate",
+    "generate:session-secret": "node scripts/generate-session-secret.mjs",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "hash:admin": "node scripts/hash-admin-password.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.46.0",
+    "@supabase/supabase-js": "^2.99.3",
+    "bcryptjs": "^3.0.3",
+    "nuxt": "^4.4.2",
+    "vue": "^3.5.30",
+    "vue-router": "^5.0.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vue/language-core": "^3.2.6",
+    "vitest": "^4.1.0",
+    "vue-tsc": "^3.2.6"
+  }
+}
