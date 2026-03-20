@@ -31,16 +31,17 @@ npm run generate:session-secret
 5. Validate your local deployment settings:
 
 ```bash
+npm run preview:doctor
 npm run deploy:check
 ```
 
 6. Run the local release checks:
 
 ```bash
-npm run typecheck
-npm test
-npm run build
+npm run preview:ready
 ```
+
+If you prefer the long form, `npm run preview:ready` runs `deploy:check`, `typecheck`, `test`, and `build` in sequence and stops on the first failure.
 
 ## Vercel Setup
 

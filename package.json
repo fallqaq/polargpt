@@ -13,6 +13,8 @@
     "deploy:check": "node scripts/check-deploy-readiness.mjs",
     "generate": "nuxt generate",
     "generate:session-secret": "node scripts/generate-session-secret.mjs",
+    "preview:doctor": "node scripts/preview-doctor.mjs",
+    "preview:ready": "node scripts/run-preview-readiness.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",

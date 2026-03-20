@@ -2,6 +2,8 @@
 
 polarGPT is a single-admin AI chat console built with Nuxt 4, Supabase, and the Gemini API. It delivers a focused ChatGPT-style workflow with conversation history, image/document uploads, and a lightweight password gate instead of a full login system.
 
+If you are new to deployment, start with the Chinese step-by-step Preview guide in [`docs/preview-onboarding.zh-CN.md`](/Users/huangyiteng/Desktop/web-ai/docs/preview-onboarding.zh-CN.md).
+
 ## Stack
 
 - Frontend: Nuxt 4 + Vue 3
@@ -75,6 +77,8 @@ The app will be available at `http://localhost:3000`.
 - `npm run dev`: start the local Nuxt dev server
 - `npm run build`: build a production bundle
 - `npm run preview`: preview the built server locally
+- `npm run preview:doctor`: inspect local blockers before GitHub/Supabase/Vercel setup
+- `npm run preview:ready`: run the full local pre-release checklist in sequence
 - `npm run typecheck`: run Nuxt/Vue type checking
 - `npm run test`: run Vitest with coverage
 - `npm run test:watch`: run Vitest in watch mode
@@ -108,3 +112,4 @@ See [`docs/deployment.md`](/Users/huangyiteng/Desktop/web-ai/docs/deployment.md)
 - Data model: [`docs/data-model.md`](/Users/huangyiteng/Desktop/web-ai/docs/data-model.md)
 - Deployment: [`docs/deployment.md`](/Users/huangyiteng/Desktop/web-ai/docs/deployment.md)
 - Operations: [`docs/operations.md`](/Users/huangyiteng/Desktop/web-ai/docs/operations.md)
+- Beginner Preview guide: [`docs/preview-onboarding.zh-CN.md`](/Users/huangyiteng/Desktop/web-ai/docs/preview-onboarding.zh-CN.md)
