@@ -44,7 +44,11 @@ create index if not exists attachments_message_id_created_at_idx
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.attachments enable row level security;
-alter table storage.objects enable row level security;
+
+-- `storage.objects` is managed by Supabase. Attempting to alter ownership or
+-- RLS state from the SQL editor can fail with `must be owner of table objects`.
+-- This app uses a private bucket plus the server-side service role, so we keep
+-- our migration away from direct `storage.objects` table alterations.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

@@ -70,11 +70,11 @@ npm run hash:admin -- "你准备登录后台时要用的密码"
 ### 3.2 在本地连接远端仓库
 
 ```bash
-git remote add origin https://github.com/<你的GitHub用户名>/polargpt.git
+git remote add origin git@github.com:fallqaq/polargpt.git
 git push -u origin main
 ```
 
-对零基础场景，默认优先用 HTTPS，不用先折腾 GitHub SSH key。
+如果你用的是 HTTPS，也可以把 `git@github.com:...` 换成 GitHub 页面给你的 HTTPS 地址。
 
 ## 第 4 步：创建 Supabase Preview 项目
 
