@@ -12,6 +12,7 @@ const emit = defineEmits<{
   logout: []
 }>()
 
+const { t } = useUiPreferences()
 const editing = ref(false)
 const draftTitle = ref('')
 
@@ -49,7 +50,7 @@ async function submitRename() {
 <template>
   <header class="conversation-header">
     <div class="conversation-header__meta">
-      <p class="surface-label">Workspace</p>
+      <p class="surface-label">{{ t('headerWorkspaceLabel') }}</p>
 
       <template v-if="props.conversation">
         <div v-if="editing" class="conversation-header__edit">
@@ -61,23 +62,21 @@ async function submitRename() {
             @keydown.enter.prevent="submitRename"
             @keydown.esc.prevent="cancelEditing"
           >
-          <button class="button button--ghost" type="button" @click="cancelEditing">
-            Cancel
-          </button>
+          <button class="button button--ghost" type="button" @click="cancelEditing">{{ t('headerCancel') }}</button>
           <button class="button" type="button" @click="submitRename">
-            Save
+            {{ t('headerSave') }}
           </button>
         </div>
 
         <div v-else class="conversation-header__summary">
           <h2>{{ props.conversation.title }}</h2>
-          <p>{{ props.conversation.summary || 'This conversation has not produced a summary yet.' }}</p>
+          <p>{{ props.conversation.summary || t('headerNoSummaryYet') }}</p>
         </div>
       </template>
 
       <div v-else class="conversation-header__summary">
-        <h2>Fresh workspace</h2>
-        <p>Create a conversation and start asking questions, or drop in a PDF/image to begin with context.</p>
+        <h2>{{ t('headerFreshTitle') }}</h2>
+        <p>{{ t('headerFreshDescription') }}</p>
       </div>
     </div>
 
@@ -89,7 +88,7 @@ async function submitRename() {
         :disabled="props.pending"
         @click="startEditing"
       >
-        Rename
+        {{ t('headerRename') }}
       </button>
       <button
         v-if="props.conversation"
@@ -98,11 +97,9 @@ async function submitRename() {
         :disabled="props.pending"
         @click="$emit('delete')"
       >
-        Delete
+        {{ t('headerDelete') }}
       </button>
-      <button class="button button--ghost" type="button" @click="$emit('logout')">
-        Logout
-      </button>
+      <button class="button button--ghost" type="button" @click="$emit('logout')">{{ t('headerLogout') }}</button>
     </div>
   </header>
 </template>

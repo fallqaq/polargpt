@@ -7,6 +7,7 @@ const props = defineProps<{
   loading: boolean
 }>()
 
+const { formatDateTime, t } = useUiPreferences()
 const searchQuery = defineModel<string>('searchQuery', { default: '' })
 
 defineEmits<{
@@ -17,15 +18,15 @@ defineEmits<{
 
 function formatTimestamp(value: string | null) {
   if (!value) {
-    return 'No messages yet'
+    return t('sidebarNoMessagesYet')
   }
 
-  return new Intl.DateTimeFormat('zh-CN', {
+  return formatDateTime(value, {
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    month: 'short',
-    day: 'numeric'
-  }).format(new Date(value))
+    month: 'short'
+  })
 }
 </script>
 
@@ -33,31 +34,31 @@ function formatTimestamp(value: string | null) {
   <aside class="sidebar panel">
     <div class="sidebar__head">
       <div>
-        <p class="surface-label">History</p>
+        <p class="surface-label">{{ t('sidebarHistoryLabel') }}</p>
         <h1 class="sidebar__title">polarGPT</h1>
       </div>
       <button class="button" type="button" @click="$emit('create')">
-        New Chat
+        {{ t('sidebarNewChat') }}
       </button>
     </div>
 
     <label class="sidebar__search">
-      <span class="sr-only">Search history</span>
+      <span class="sr-only">{{ t('sidebarSearchAria') }}</span>
       <input
         v-model="searchQuery"
         class="text-input"
         type="search"
-        placeholder="Search titles and summaries"
+        :placeholder="t('sidebarSearchPlaceholder')"
       >
     </label>
 
     <div class="sidebar__body">
       <p v-if="loading" class="sidebar__state">
-        Loading conversations...
+        {{ t('sidebarLoading') }}
       </p>
 
       <p v-else-if="props.conversations.length === 0" class="sidebar__state">
-        No conversations yet. Start a new one from the button above.
+        {{ t('sidebarEmpty') }}
       </p>
 
       <article
@@ -77,16 +78,16 @@ function formatTimestamp(value: string | null) {
             <strong>{{ conversation.title }}</strong>
             <time>{{ formatTimestamp(conversation.lastMessageAt ?? conversation.updatedAt) }}</time>
           </div>
-          <p>{{ conversation.summary || 'No summary yet.' }}</p>
+          <p>{{ conversation.summary || t('sidebarNoSummaryYet') }}</p>
         </button>
 
         <button
           class="sidebar__delete"
           type="button"
-          aria-label="Delete conversation"
+          :aria-label="t('sidebarDeleteConversationAria')"
           @click="$emit('delete', conversation.id)"
         >
-          Delete
+          {{ t('sidebarDelete') }}
         </button>
       </article>
     </div>
@@ -137,14 +138,14 @@ function formatTimestamp(value: string | null) {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-surface-soft);
 }
 
 .sidebar__conversation--active {
-  border-color: rgba(249, 115, 22, 0.42);
-  background: rgba(249, 115, 22, 0.12);
+  border-color: var(--color-toolbar-active-border);
+  background: var(--color-accent-soft);
 }
 
 .sidebar__conversation-main,
@@ -189,7 +190,7 @@ function formatTimestamp(value: string | null) {
   min-height: 36px;
   padding: 0 12px;
   border-radius: 999px;
-  color: #ffb8c6;
+  color: var(--color-danger-soft);
 }
 
 @media (max-width: 1080px) {

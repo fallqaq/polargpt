@@ -7,6 +7,7 @@ const props = defineProps<{
   pending: boolean
 }>()
 
+const { formatDateTime, t } = useUiPreferences()
 const scroller = ref<HTMLElement | null>(null)
 
 watch(() => props.messages.length, async () => {
@@ -21,11 +22,10 @@ watch(() => props.messages.length, async () => {
 <template>
   <section ref="scroller" class="thread panel">
     <div v-if="props.messages.length === 0" class="thread__empty">
-      <p class="surface-label">Ready</p>
-      <h3>Start with a direct prompt or upload context first.</h3>
+      <p class="surface-label">{{ t('threadReadyLabel') }}</p>
+      <h3>{{ t('threadEmptyTitle') }}</h3>
       <p class="empty-copy">
-        Supported inputs in v1 are PNG, JPEG, WebP, PDF, TXT, and Markdown. The assistant will keep the
-        conversation history in the left rail.
+        {{ t('threadEmptyDescription') }}
       </p>
     </div>
 
@@ -35,11 +35,11 @@ watch(() => props.messages.length, async () => {
       :class="['thread__message', `thread__message--${message.role}`]"
     >
       <div class="thread__message-head">
-        <span class="surface-label">{{ message.role === 'assistant' ? 'Assistant' : 'You' }}</span>
-        <span class="thread__timestamp">{{ new Date(message.createdAt).toLocaleString('zh-CN') }}</span>
+        <span class="surface-label">{{ message.role === 'assistant' ? t('threadRoleAssistant') : t('threadRoleUser') }}</span>
+        <span class="thread__timestamp">{{ formatDateTime(message.createdAt) }}</span>
       </div>
 
-      <pre class="thread__content">{{ message.content || 'No text content.' }}</pre>
+      <pre class="thread__content">{{ message.content || t('threadNoTextContent') }}</pre>
 
       <div v-if="message.attachments.length > 0" class="thread__attachments">
         <a
@@ -65,7 +65,7 @@ watch(() => props.messages.length, async () => {
     </article>
 
     <div v-if="props.pending" class="thread__pending">
-      Generating the next answer...
+      {{ t('threadGenerating') }}
     </div>
   </section>
 </template>
@@ -96,7 +96,7 @@ watch(() => props.messages.length, async () => {
   display: grid;
   gap: 14px;
   padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
   border-radius: 24px;
 }
 
@@ -139,9 +139,9 @@ watch(() => props.messages.length, async () => {
   gap: 10px;
   width: min(18rem, 100%);
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
   border-radius: 18px;
-  background: rgba(6, 11, 20, 0.42);
+  background: var(--color-surface-strong);
 }
 
 .thread__preview {
@@ -171,7 +171,7 @@ watch(() => props.messages.length, async () => {
   justify-self: start;
   padding: 12px 16px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-soft);
   color: var(--color-muted);
 }
 </style>

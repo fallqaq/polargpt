@@ -5,6 +5,7 @@ definePageMeta({
 
 const route = useRoute()
 const chat = usePolarGptChat()
+const { t } = useUiPreferences()
 const draftText = ref('')
 const draftFiles = ref<File[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -66,7 +67,7 @@ async function handleDelete(conversationId?: string | null) {
     return
   }
 
-  if (!window.confirm('Delete this conversation permanently?')) {
+  if (!window.confirm(t('chatConfirmDelete'))) {
     return
   }
 
@@ -127,7 +128,7 @@ async function handleRename(title: string) {
   display: grid;
   grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
   gap: 20px;
-  min-height: calc(100vh - 48px);
+  min-height: 100%;
 }
 
 .workspace__main {

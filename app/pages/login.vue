@@ -11,10 +11,11 @@ const password = ref('')
 const pending = ref(false)
 const errorMessage = ref<string | null>(null)
 const adminHintCookie = useCookie<string | null>(ADMIN_HINT_COOKIE_NAME)
+const { locale, t } = useUiPreferences()
 
 async function submit() {
   if (!password.value.trim()) {
-    errorMessage.value = 'Please enter the administrator password.'
+    errorMessage.value = t('loginPasswordRequired')
     return
   }
 
@@ -33,7 +34,10 @@ async function submit() {
     await navigateTo('/chat')
   }
   catch (error) {
-    errorMessage.value = getRequestErrorMessage(error, 'Login failed.')
+    errorMessage.value = getRequestErrorMessage(error, {
+      locale: locale.value,
+      fallbackKey: 'errorLoginFailed'
+    })
   }
   finally {
     pending.value = false
@@ -44,27 +48,26 @@ async function submit() {
 <template>
   <section class="login">
     <div class="login__intro">
-      <p class="surface-label">Single Admin Mode</p>
-      <h1>polarGPT control room</h1>
+      <p class="surface-label">{{ t('loginModeLabel') }}</p>
+      <h1>{{ t('loginTitle') }}</h1>
       <p>
-        A trimmed AI workspace for one administrator. Sign in with the environment-managed password to
-        access Gemini-powered chat, file uploads, and history search.
+        {{ t('loginDescription') }}
       </p>
     </div>
 
     <form class="login__card panel" @submit.prevent="submit">
       <div>
-        <p class="surface-label">Access</p>
-        <h2>Administrator Sign In</h2>
+        <p class="surface-label">{{ t('loginAccessLabel') }}</p>
+        <h2>{{ t('loginSignInTitle') }}</h2>
       </div>
 
       <label class="login__field">
-        <span>Password</span>
+        <span>{{ t('loginPasswordLabel') }}</span>
         <input
           v-model="password"
           class="text-input"
           type="password"
-          placeholder="Enter admin password"
+          :placeholder="t('loginPasswordPlaceholder')"
           autocomplete="current-password"
         >
       </label>
@@ -74,7 +77,7 @@ async function submit() {
       </p>
 
       <button class="button login__submit" type="submit" :disabled="pending">
-        {{ pending ? 'Signing In...' : 'Enter polarGPT' }}
+        {{ pending ? t('loginSubmitBusy') : t('loginSubmitIdle') }}
       </button>
     </form>
   </section>
@@ -86,7 +89,7 @@ async function submit() {
   grid-template-columns: minmax(0, 1.1fr) minmax(22rem, 30rem);
   gap: 24px;
   align-items: stretch;
-  min-height: calc(100vh - 48px);
+  min-height: 100%;
 }
 
 .login__intro,
@@ -119,7 +122,7 @@ async function submit() {
   display: grid;
   align-content: center;
   gap: 18px;
-  background: var(--color-shell-strong);
+  background: var(--color-panel-strong);
 }
 
 .login__card h2 {

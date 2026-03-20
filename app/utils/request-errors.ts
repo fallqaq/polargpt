@@ -1,15 +1,27 @@
 import { FetchError } from 'ofetch'
+import type { UiLocale, UiTextKey } from './ui'
+import { translateKnownErrorMessage } from './ui'
 
-export function getRequestErrorMessage(error: unknown, fallback = 'Something went wrong.') {
+export function getRequestErrorMessage(
+  error: unknown,
+  options: {
+    locale: UiLocale
+    fallbackKey?: UiTextKey
+  }
+) {
+  const fallbackKey = options.fallbackKey ?? 'errorGeneric'
+
   if (error instanceof FetchError) {
-    return (error.data as { statusMessage?: string } | undefined)?.statusMessage
-      || error.statusMessage
-      || fallback
+    return translateKnownErrorMessage(
+      options.locale,
+      (error.data as { statusMessage?: string } | undefined)?.statusMessage || error.statusMessage,
+      fallbackKey
+    )
   }
 
   if (error instanceof Error) {
-    return error.message
+    return translateKnownErrorMessage(options.locale, error.message, fallbackKey)
   }
 
-  return fallback
+  return translateKnownErrorMessage(options.locale, null, fallbackKey)
 }

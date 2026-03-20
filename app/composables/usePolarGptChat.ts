@@ -16,6 +16,7 @@ import { getRequestErrorMessage } from '../utils/request-errors'
 export function usePolarGptChat() {
   const route = useRoute()
   const router = useRouter()
+  const { locale } = useUiPreferences()
   const adminHintCookie = useCookie<string | null>(ADMIN_HINT_COOKIE_NAME)
   const conversations = useState<ConversationSummary[]>('polargpt-conversations', () => [])
   const activeConversation = useState<ConversationDetail | null>('polargpt-active-conversation', () => null)
@@ -75,7 +76,10 @@ export function usePolarGptChat() {
       conversations.value = response.conversations
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to load conversation history.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorLoadConversationHistory'
+      })
     }
     finally {
       listPending.value = false
@@ -102,7 +106,10 @@ export function usePolarGptChat() {
       }
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to open the conversation.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorOpenConversation'
+      })
     }
     finally {
       conversationPending.value = false
@@ -125,7 +132,10 @@ export function usePolarGptChat() {
       return response.conversation
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to create a new conversation.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorCreateConversation'
+      })
       throw error
     }
   }
@@ -160,7 +170,10 @@ export function usePolarGptChat() {
       }
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to rename the conversation.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorRenameConversation'
+      })
       throw error
     }
   }
@@ -194,7 +207,10 @@ export function usePolarGptChat() {
       }
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to delete the conversation.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorDeleteConversation'
+      })
       throw error
     }
   }
@@ -229,7 +245,10 @@ export function usePolarGptChat() {
       })
     }
     catch (error) {
-      errorMessage.value = getRequestErrorMessage(error, 'Failed to send the message.')
+      errorMessage.value = getRequestErrorMessage(error, {
+        locale: locale.value,
+        fallbackKey: 'errorSendMessage'
+      })
       throw error
     }
     finally {

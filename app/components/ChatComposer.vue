@@ -10,6 +10,7 @@ const emit = defineEmits<{
   submit: []
 }>()
 
+const { t, translateError } = useUiPreferences()
 const draftText = defineModel<string>('text', { default: '' })
 const draftFiles = defineModel<File[]>('files', { default: () => [] })
 const localError = ref<string | null>(null)
@@ -19,7 +20,9 @@ function onFileChange(event: Event) {
   const files = Array.from(input.files ?? [])
 
   if (draftFiles.value.length + files.length > MAX_ATTACHMENTS_PER_MESSAGE) {
-    localError.value = `You can upload up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message.`
+    localError.value = t('errorTooManyAttachments', {
+      count: MAX_ATTACHMENTS_PER_MESSAGE
+    })
     input.value = ''
     return
   }
@@ -34,7 +37,7 @@ function onFileChange(event: Event) {
     })
 
     if (!validation.valid) {
-      localError.value = validation.reason ?? 'Unsupported attachment.'
+      localError.value = translateError(validation.reason, 'errorAttachmentValidationFailed')
       input.value = ''
       return
     }
@@ -64,11 +67,11 @@ function submit() {
   <div class="composer panel">
     <div class="composer__top">
       <div>
-        <p class="surface-label">Prompt</p>
-        <h3>Attach context, then ask directly.</h3>
+        <p class="surface-label">{{ t('composerPromptLabel') }}</p>
+        <h3>{{ t('composerTitle') }}</h3>
       </div>
       <label class="button button--ghost composer__upload">
-        Attach Files
+        {{ t('composerAttachFiles') }}
         <input
           class="sr-only"
           type="file"
@@ -82,7 +85,7 @@ function submit() {
     <textarea
       v-model="draftText"
       class="textarea-input"
-      placeholder="Ask a question, add instructions, or describe what to do with the files..."
+      :placeholder="t('composerPlaceholder')"
       :disabled="props.busy"
       @keydown.meta.enter.prevent="submit"
       @keydown.ctrl.enter.prevent="submit"
@@ -92,11 +95,9 @@ function submit() {
       <article v-for="(file, index) in draftFiles" :key="`${file.name}-${index}`" class="composer__file">
         <div>
           <strong>{{ file.name }}</strong>
-          <p>{{ file.type || 'Unknown type' }} · {{ formatBytes(file.size) }}</p>
+          <p>{{ file.type || t('composerUnknownType') }} · {{ formatBytes(file.size) }}</p>
         </div>
-        <button type="button" @click="removeFile(index)">
-          Remove
-        </button>
+        <button type="button" @click="removeFile(index)">{{ t('composerRemove') }}</button>
       </article>
     </div>
 
@@ -106,7 +107,7 @@ function submit() {
 
     <div class="composer__actions">
       <p class="composer__hint">
-        `Cmd/Ctrl + Enter` to send. Up to {{ MAX_ATTACHMENTS_PER_MESSAGE }} attachments per message.
+        {{ t('composerHint', { count: MAX_ATTACHMENTS_PER_MESSAGE }) }}
       </p>
       <button
         class="button"
@@ -114,7 +115,7 @@ function submit() {
         :disabled="props.busy || (!draftText.trim() && draftFiles.length === 0)"
         @click="submit"
       >
-        {{ props.busy ? 'Sending...' : 'Send Message' }}
+        {{ props.busy ? t('composerSubmitBusy') : t('composerSubmitIdle') }}
       </button>
     </div>
   </div>
@@ -157,7 +158,7 @@ function submit() {
   min-width: min(18rem, 100%);
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-surface-soft);
 }
 
 .composer__file p {
@@ -169,7 +170,7 @@ function submit() {
 .composer__file button {
   border: 0;
   background: transparent;
-  color: #ffc8a8;
+  color: var(--color-signal);
 }
 
 .composer__actions {
