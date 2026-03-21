@@ -2,6 +2,7 @@ import { getQuery } from 'h3'
 import { z } from 'zod'
 import type { ConversationListResponse } from '#shared/types/chat'
 import { listConversationSummaries } from '#server/services/conversation-service'
+import { setResponseBytes } from '#server/utils/request-metrics'
 
 const querySchema = z.object({
   q: z.string().optional()
@@ -9,9 +10,12 @@ const querySchema = z.object({
 
 export default defineEventHandler(async (event): Promise<ConversationListResponse> => {
   const query = querySchema.parse(getQuery(event))
-  const conversations = await listConversationSummaries(query.q)
+  const conversations = await listConversationSummaries(query.q, event)
 
-  return {
+  const response = {
     conversations
   }
+
+  setResponseBytes(event, response)
+  return response
 })

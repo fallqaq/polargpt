@@ -53,7 +53,7 @@ function formatTimestamp(value: string | null) {
     </label>
 
     <div class="sidebar__body">
-      <p v-if="loading" class="sidebar__state">
+      <p v-if="loading && props.conversations.length === 0" class="sidebar__state">
         {{ t('sidebarLoading') }}
       </p>
 
@@ -61,35 +61,41 @@ function formatTimestamp(value: string | null) {
         {{ t('sidebarEmpty') }}
       </p>
 
-      <article
-        v-for="conversation in props.conversations"
-        :key="conversation.id"
-        :class="[
-          'sidebar__conversation',
-          conversation.id === props.activeConversationId && 'sidebar__conversation--active'
-        ]"
-      >
-        <button
-          class="sidebar__conversation-main"
-          type="button"
-          @click="$emit('select', conversation.id)"
-        >
-          <div class="sidebar__conversation-header">
-            <strong>{{ conversation.title }}</strong>
-            <time>{{ formatTimestamp(conversation.lastMessageAt ?? conversation.updatedAt) }}</time>
-          </div>
-          <p>{{ conversation.summary || t('sidebarNoSummaryYet') }}</p>
-        </button>
+      <template v-else>
+        <p v-if="loading" class="sidebar__state">
+          {{ t('sidebarLoading') }}
+        </p>
 
-        <button
-          class="sidebar__delete"
-          type="button"
-          :aria-label="t('sidebarDeleteConversationAria')"
-          @click="$emit('delete', conversation.id)"
+        <article
+          v-for="conversation in props.conversations"
+          :key="conversation.id"
+          :class="[
+            'sidebar__conversation',
+            conversation.id === props.activeConversationId && 'sidebar__conversation--active'
+          ]"
         >
-          {{ t('sidebarDelete') }}
-        </button>
-      </article>
+          <button
+            class="sidebar__conversation-main"
+            type="button"
+            @click="$emit('select', conversation.id)"
+          >
+            <div class="sidebar__conversation-header">
+              <strong>{{ conversation.title }}</strong>
+              <time>{{ formatTimestamp(conversation.lastMessageAt ?? conversation.updatedAt) }}</time>
+            </div>
+            <p>{{ conversation.summary || t('sidebarNoSummaryYet') }}</p>
+          </button>
+
+          <button
+            class="sidebar__delete"
+            type="button"
+            :aria-label="t('sidebarDeleteConversationAria')"
+            @click="$emit('delete', conversation.id)"
+          >
+            {{ t('sidebarDelete') }}
+          </button>
+        </article>
+      </template>
     </div>
   </aside>
 </template>

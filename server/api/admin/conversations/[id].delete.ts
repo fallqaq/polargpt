@@ -1,5 +1,6 @@
 import { createError, getRouterParam } from 'h3'
 import { deleteConversation } from '#server/services/conversation-service'
+import { setResponseBytes } from '#server/utils/request-metrics'
 
 export default defineEventHandler(async (event) => {
   const conversationId = getRouterParam(event, 'id')
@@ -11,9 +12,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await deleteConversation(conversationId)
+  await deleteConversation(conversationId, event)
 
-  return {
+  const response = {
     ok: true
   }
+
+  setResponseBytes(event, response)
+  return response
 })

@@ -1,4 +1,5 @@
-import { createError } from 'h3'
+import { createError, type H3Event } from 'h3'
+import type { SendMessageDeltaResponse } from '#shared/types/chat'
 import { DEFAULT_CONVERSATION_TITLE } from '#shared/constants/polargpt'
 import { buildAttachmentOnlyLabel } from '#shared/utils/files'
 import {
@@ -7,7 +8,12 @@ import {
   normalizeMessageText
 } from '#shared/utils/text'
 import type { AttachmentRow, ConversationRow, MessageRow } from '../types/database'
-import { getConversationDetailOrThrow, getConversationDataAccess } from './conversation-service'
+import {
+  groupAttachmentsByMessageId,
+  mapConversationSummary,
+  mapMessageRecord
+} from '../utils/conversation-mappers'
+import { getConversationDataAccess } from './conversation-service'
 import { uploadMessageAttachments, type ValidatedAttachmentUpload } from './attachment-service'
 import { generateAssistantReply } from './gemini-service'
 
@@ -36,7 +42,6 @@ export interface MessageServiceDependencies {
   updateConversation: (conversationId: string, patch: Partial<ConversationRow>) => Promise<ConversationRow>
   uploadMessageAttachments: typeof uploadMessageAttachments
   generateAssistantReply: typeof generateAssistantReply
-  getConversationDetailOrThrow: typeof getConversationDetailOrThrow
 }
 
 export function createMessageService(dependencies: MessageServiceDependencies) {
@@ -45,7 +50,8 @@ export function createMessageService(dependencies: MessageServiceDependencies) {
       conversationId: string
       text: string
       attachments: ValidatedAttachmentUpload[]
-    }) {
+      event?: H3Event
+    }): Promise<SendMessageDeltaResponse> {
       const normalizedText = normalizeMessageText(input.text)
 
       if (!normalizedText && input.attachments.length === 0) {
@@ -77,7 +83,8 @@ export function createMessageService(dependencies: MessageServiceDependencies) {
         const attachmentRows = await dependencies.uploadMessageAttachments({
           conversationId: input.conversationId,
           messageId: userMessage.id,
-          attachments: input.attachments
+          attachments: input.attachments,
+          event: input.event
         })
 
         storedAttachments = await dependencies.insertAttachments(attachmentRows)
@@ -100,13 +107,15 @@ export function createMessageService(dependencies: MessageServiceDependencies) {
 
       const messages = await dependencies.listMessages(input.conversationId)
       const attachments = await dependencies.listAttachmentsByMessageIds(messages.map((message) => message.id))
+      const attachmentsByMessageId = groupAttachmentsByMessageId(attachments)
       const messagesWithAttachments = messages.map((message) => ({
         ...message,
-        attachments: attachments.filter((attachment) => attachment.message_id === message.id)
+        attachments: attachmentsByMessageId.get(message.id) ?? []
       }))
 
       const assistantReply = await dependencies.generateAssistantReply({
-        messages: messagesWithAttachments
+        messages: messagesWithAttachments,
+        event: input.event
       })
 
       const assistantMessage = await dependencies.insertMessage({
@@ -117,7 +126,7 @@ export function createMessageService(dependencies: MessageServiceDependencies) {
         status: 'completed'
       })
 
-      await dependencies.updateConversation(input.conversationId, {
+      const updatedConversation = await dependencies.updateConversation(input.conversationId, {
         title: nextTitle,
         summary: buildConversationSummary({
           userSnippet,
@@ -126,7 +135,13 @@ export function createMessageService(dependencies: MessageServiceDependencies) {
         last_message_at: assistantMessage.created_at
       })
 
-      return dependencies.getConversationDetailOrThrow(input.conversationId)
+      return {
+        conversation: mapConversationSummary(updatedConversation),
+        appendedMessages: [
+          mapMessageRecord(userMessage, storedAttachments),
+          mapMessageRecord(assistantMessage, [])
+        ]
+      }
     }
   }
 }
@@ -135,13 +150,13 @@ export async function sendConversationMessage(input: {
   conversationId: string
   text: string
   attachments: ValidatedAttachmentUpload[]
+  event?: H3Event
 }) {
-  const repository = getConversationDataAccess()
+  const repository = getConversationDataAccess(input.event)
   const messageService = createMessageService({
     ...repository,
     uploadMessageAttachments,
-    generateAssistantReply,
-    getConversationDetailOrThrow
+    generateAssistantReply
   })
 
   return messageService.sendMessage(input)

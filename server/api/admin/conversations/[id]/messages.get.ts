@@ -1,8 +1,8 @@
 import { createError, getQuery, getRouterParam } from 'h3'
 import { z } from 'zod'
-import type { ConversationDetailPageResponse } from '#shared/types/chat'
+import type { ConversationMessagesPageResponse } from '#shared/types/chat'
 import { DEFAULT_MESSAGES_PAGE_LIMIT } from '#shared/constants/polargpt'
-import { getConversationMessagesPageOrThrow } from '#server/services/conversation-service'
+import { getConversationMessagesOnlyOrThrow } from '#server/services/conversation-service'
 import { incrementCountMetric, setResponseBytes } from '#server/utils/request-metrics'
 
 const querySchema = z.object({
@@ -10,7 +10,7 @@ const querySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional()
 })
 
-export default defineEventHandler(async (event): Promise<ConversationDetailPageResponse> => {
+export default defineEventHandler(async (event): Promise<ConversationMessagesPageResponse> => {
   const conversationId = getRouterParam(event, 'id')
 
   if (!conversationId) {
@@ -21,13 +21,15 @@ export default defineEventHandler(async (event): Promise<ConversationDetailPageR
   }
 
   const query = querySchema.parse(getQuery(event))
-  const response = await getConversationMessagesPageOrThrow(conversationId, {
+  const page = await getConversationMessagesOnlyOrThrow(conversationId, {
     beforeMessageId: query.before,
     limit: query.limit ?? DEFAULT_MESSAGES_PAGE_LIMIT
   }, event)
 
-  incrementCountMetric(event, 'messageCount', response.page.messages.length)
-  incrementCountMetric(event, 'attachmentCount', response.page.messages.reduce((count, message) =>
+  const response = { page }
+
+  incrementCountMetric(event, 'messageCount', page.messages.length)
+  incrementCountMetric(event, 'attachmentCount', page.messages.reduce((count, message) =>
     count + message.attachments.length, 0))
   setResponseBytes(event, response)
 

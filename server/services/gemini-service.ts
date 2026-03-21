@@ -1,9 +1,10 @@
 import { GoogleGenAI } from '@google/genai'
-import { createError } from 'h3'
+import { createError, type H3Event } from 'h3'
 import { DEFAULT_GEMINI_MODEL } from '#shared/constants/polargpt'
 import type { AttachmentRow, MessageRow } from '../types/database'
 import { buildGeminiContents } from '../utils/gemini-content'
 import { reportServerError } from '../utils/logger'
+import { measureRequestMetric } from '../utils/request-metrics'
 import { getServerRuntimeConfig, requireServerConfigValue } from '../utils/runtime-config'
 
 let cachedClient: GoogleGenAI | null = null
@@ -26,10 +27,11 @@ export async function uploadGeminiFile(input: {
   buffer: Buffer
   mimeType: string
   fileName: string
+  event?: H3Event
 }) {
   const client = getGeminiClient()
 
-  return client.files.upload({
+  return measureRequestMetric(input.event, 'geminiMs', async () => client.files.upload({
     file: new Blob([new Uint8Array(input.buffer)], {
       type: input.mimeType
     }),
@@ -37,7 +39,7 @@ export async function uploadGeminiFile(input: {
       mimeType: input.mimeType,
       displayName: input.fileName
     }
-  })
+  }))
 }
 
 export async function deleteGeminiFile(fileName: string) {
@@ -51,12 +53,13 @@ export async function deleteGeminiFile(fileName: string) {
  */
 export async function generateAssistantReply(input: {
   messages: Array<MessageRow & { attachments: AttachmentRow[] }>
+  event?: H3Event
 }) {
   const client = getGeminiClient()
   const config = getServerRuntimeConfig()
 
   try {
-    const response = await client.models.generateContent({
+    const response = await measureRequestMetric(input.event, 'geminiMs', async () => client.models.generateContent({
       model: config.geminiModel || DEFAULT_GEMINI_MODEL,
       contents: buildGeminiContents(input.messages),
       config: {
@@ -66,7 +69,7 @@ export async function generateAssistantReply(input: {
           'If a document or image is unclear, say what is missing instead of fabricating content.'
         ].join(' ')
       }
-    })
+    }))
 
     const text = extractResponseText(response)
 

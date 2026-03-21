@@ -1,4 +1,4 @@
-import { createError } from 'h3'
+import { createError, type H3Event } from 'h3'
 import {
   ATTACHMENT_BUCKET,
   SIGNED_ATTACHMENT_URL_TTL_SECONDS,
@@ -12,6 +12,7 @@ import {
 import type { AttachmentInsertRow, AttachmentRow } from '../types/database'
 import { getSupabaseAdminClient } from '../utils/supabase-admin'
 import { reportServerError } from '../utils/logger'
+import { measureRequestMetric } from '../utils/request-metrics'
 import { deleteGeminiFile, uploadGeminiFile } from './gemini-service'
 
 export interface MultipartAttachmentPart {
@@ -86,10 +87,33 @@ function buildStoragePath(conversationId: string, messageId: string, fileName: s
   return `${conversationId}/${messageId}/${Date.now()}-${normalized}`
 }
 
+async function runWithConcurrencyLimit<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<void>
+) {
+  const executing = new Set<Promise<void>>()
+
+  for (const [index, item] of items.entries()) {
+    const task = worker(item, index).finally(() => {
+      executing.delete(task)
+    })
+
+    executing.add(task)
+
+    if (executing.size >= limit) {
+      await Promise.race(executing)
+    }
+  }
+
+  await Promise.all(executing)
+}
+
 export async function uploadMessageAttachments(input: {
   conversationId: string
   messageId: string
   attachments: ValidatedAttachmentUpload[]
+  event?: H3Event
 }) {
   const client = getSupabaseAdminClient()
   const createdRows: AttachmentInsertRow[] = []
@@ -97,14 +121,22 @@ export async function uploadMessageAttachments(input: {
   const uploadedGeminiFiles: string[] = []
 
   try {
-    for (const attachment of input.attachments) {
+    await runWithConcurrencyLimit(input.attachments, 2, async (attachment, index) => {
       const storagePath = buildStoragePath(input.conversationId, input.messageId, attachment.fileName)
-      const uploadResult = await client.storage
-        .from(ATTACHMENT_BUCKET)
-        .upload(storagePath, attachment.buffer, {
-          contentType: attachment.mimeType,
-          upsert: false
+      const [uploadResult, geminiFile] = await Promise.all([
+        measureRequestMetric(input.event, 'storageMs', async () => client.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(storagePath, attachment.buffer, {
+            contentType: attachment.mimeType,
+            upsert: false
+          })),
+        uploadGeminiFile({
+          buffer: attachment.buffer,
+          mimeType: attachment.mimeType,
+          fileName: attachment.fileName,
+          event: input.event
         })
+      ])
 
       if (uploadResult.error) {
         throw createError({
@@ -115,17 +147,11 @@ export async function uploadMessageAttachments(input: {
 
       uploadedStoragePaths.push(storagePath)
 
-      const geminiFile = await uploadGeminiFile({
-        buffer: attachment.buffer,
-        mimeType: attachment.mimeType,
-        fileName: attachment.fileName
-      })
-
       if (geminiFile.name) {
         uploadedGeminiFiles.push(geminiFile.name)
       }
 
-      createdRows.push({
+      createdRows[index] = {
         message_id: input.messageId,
         kind: attachment.kind,
         original_name: attachment.fileName,
@@ -134,8 +160,8 @@ export async function uploadMessageAttachments(input: {
         storage_path: storagePath,
         gemini_file_name: geminiFile.name ?? null,
         gemini_file_uri: geminiFile.uri ?? null
-      })
-    }
+      }
+    })
   }
   catch (error) {
     await cleanupUploadedArtifacts(uploadedStoragePaths, uploadedGeminiFiles)
@@ -190,6 +216,15 @@ export async function createSignedAttachmentUrls(attachments: AttachmentRow[]) {
   }))
 
   return urlMap
+}
+
+export async function createAttachmentUrlRecords(attachments: AttachmentRow[], event?: H3Event) {
+  const urlMap = await measureRequestMetric(event, 'signUrlMs', async () => createSignedAttachmentUrls(attachments))
+
+  return attachments.map((attachment) => ({
+    attachmentId: attachment.id,
+    downloadUrl: urlMap.get(attachment.id) ?? null
+  }))
 }
 
 export async function removeStoredAttachments(attachments: AttachmentRow[]) {

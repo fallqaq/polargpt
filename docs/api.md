@@ -59,9 +59,11 @@ Returns the sidebar conversation list. Search only matches conversation `title` 
 
 Creates an empty conversation with the initial title `New conversation`.
 
-### `GET /api/admin/conversations/:id`
+### `GET /api/admin/conversations/:id?before=&limit=`
 
-Returns conversation metadata, all messages, attachment metadata, and short-lived signed download URLs.
+Returns conversation metadata plus the latest page of messages. The default page size is `50`.
+
+Attachments now include metadata only. Signed download URLs are fetched separately.
 
 ### `PATCH /api/admin/conversations/:id`
 
@@ -97,7 +99,26 @@ Rules:
 
 Response:
 
-- Full `ConversationDetailResponse` for the updated conversation
+- Updated conversation summary
+- `appendedMessages` containing only the newly created user and assistant turns
+
+### `GET /api/admin/conversations/:id/messages?before=&limit=`
+
+Loads older messages for an existing conversation page using the earliest loaded `message.id` as the `before` cursor.
+
+## Attachments
+
+### `POST /api/admin/attachments/urls`
+
+Request body:
+
+```json
+{
+  "attachmentIds": ["attachment-id-1", "attachment-id-2"]
+}
+```
+
+Returns short-lived signed download URLs for the requested attachments only.
 
 ## Response Contracts
 

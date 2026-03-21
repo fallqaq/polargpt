@@ -17,6 +17,8 @@
 ## Logging
 
 - Application errors currently log through `server/utils/logger.ts`.
+- Every request now emits a structured `request.metrics` log with `requestId`, route, stage timings, payload size, and counts.
+- Hot API responses also expose `x-request-id` for log correlation.
 - Use Vercel runtime logs for request failures.
 - Use Supabase logs for database and storage errors.
 

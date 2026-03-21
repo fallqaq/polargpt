@@ -4,13 +4,20 @@ definePageMeta({
 })
 
 const route = useRoute()
+const router = useRouter()
 const chat = usePolarGptChat()
 const { t } = useUiPreferences()
 const draftText = ref('')
 const draftFiles = ref<File[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-await callOnce('polargpt-chat-initial-data', () => chat.initialize())
+onMounted(() => {
+  if (typeof performance !== 'undefined') {
+    performance.mark('polargpt-route-enter')
+  }
+
+  void chat.initialize()
+})
 
 watch(chat.searchQuery, (value) => {
   if (searchTimer) {
@@ -19,12 +26,12 @@ watch(chat.searchQuery, (value) => {
 
   searchTimer = setTimeout(async () => {
     await chat.refreshConversations(value)
-    await navigateTo({
+    await router.replace({
       query: {
         ...route.query,
         q: value || undefined
       }
-    }, { replace: true })
+    })
   }, 220)
 })
 
@@ -81,6 +88,22 @@ async function handleRename(title: string) {
 
   await chat.renameConversation(chat.currentConversationId.value, title)
 }
+
+async function handleOpenAttachment(attachmentId: string) {
+  const pendingWindow = import.meta.client
+    ? window.open('', '_blank', 'noopener,noreferrer')
+    : null
+  const url = await chat.openAttachment(attachmentId)
+
+  if (url && pendingWindow) {
+    pendingWindow.location.href = url
+    return
+  }
+
+  if (pendingWindow && !url) {
+    pendingWindow.close()
+  }
+}
 </script>
 
 <template>
@@ -109,8 +132,13 @@ async function handleRename(title: string) {
       </p>
 
       <MessageThread
-        :messages="chat.activeConversation.value?.messages ?? []"
+        :messages="chat.activeMessages.value"
         :pending="chat.sendPending.value"
+        :loading="chat.conversationPending.value"
+        :has-older-messages="chat.hasOlderMessages.value"
+        :loading-older="chat.loadingOlderMessages.value"
+        @load-older="chat.loadOlderMessages"
+        @open-attachment="handleOpenAttachment"
       />
 
       <ChatComposer

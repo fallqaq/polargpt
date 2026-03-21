@@ -13,7 +13,7 @@ function getEnvValue(nuxtKey: string, plainKey: string, fallback = '') {
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   css: ['~/assets/css/main.css'],
-  devtools: { enabled: true },
+  devtools: { enabled: process.env.NODE_ENV !== 'production' },
   runtimeConfig: {
     adminPasswordHash: getEnvValue('NUXT_ADMIN_PASSWORD_HASH', 'ADMIN_PASSWORD_HASH'),
     sessionSecret: getEnvValue('NUXT_SESSION_SECRET', 'SESSION_SECRET'),
@@ -40,6 +40,22 @@ export default defineNuxtConfig({
           content: 'width=device-width, initial-scale=1'
         }
       ]
+    }
+  },
+  nitro: {
+    timing: true,
+    compressPublicAssets: true,
+    routeRules: {
+      '/_nuxt/**': {
+        headers: {
+          'cache-control': 'public, max-age=31536000, immutable'
+        }
+      },
+      '/api/**': {
+        headers: {
+          'cache-control': 'no-store'
+        }
+      }
     }
   },
   typescript: {

@@ -71,7 +71,11 @@ describe('message service integration', () => {
       insertAttachments: vi.fn().mockResolvedValue([attachmentRow]),
       listMessages: vi.fn().mockResolvedValue([userMessage]),
       listAttachmentsByMessageIds: vi.fn().mockResolvedValue([attachmentRow]),
-      updateConversation: vi.fn().mockResolvedValue(baseConversation),
+      updateConversation: vi.fn().mockImplementation(async (_conversationId, patch) => ({
+        ...baseConversation,
+        ...patch,
+        updated_at: baseConversation.updated_at
+      })),
       uploadMessageAttachments: vi.fn().mockResolvedValue([
         {
           message_id: 'message-user',
@@ -87,15 +91,6 @@ describe('message service integration', () => {
       generateAssistantReply: vi.fn().mockResolvedValue({
         text: assistantMessage.content,
         model: assistantMessage.model
-      }),
-      getConversationDetailOrThrow: vi.fn().mockResolvedValue({
-        id: 'conversation-1',
-        title: 'Summarize this report',
-        summary: 'User: Summarize this report | AI: The report focuses on deployment, storage policies, and admin access.',
-        createdAt: baseConversation.created_at,
-        updatedAt: baseConversation.updated_at,
-        lastMessageAt: assistantMessage.created_at,
-        messages: []
       })
     }
   })
@@ -128,7 +123,39 @@ describe('message service integration', () => {
       summary: 'User: Summarize this report | AI: The report focuses on deployment, storage policies, and admin access.',
       last_message_at: assistantMessage.created_at
     })
-    expect(result.title).toBe('Summarize this report')
+    expect(result.conversation.title).toBe('Summarize this report')
+    expect(result.appendedMessages).toEqual([
+      {
+        id: 'message-user',
+        conversationId: 'conversation-1',
+        role: 'user',
+        content: 'Summarize this report',
+        model: null,
+        status: 'completed',
+        createdAt: '2026-03-20T00:01:00.000Z',
+        attachments: [
+          {
+            id: 'attachment-1',
+            messageId: 'message-user',
+            kind: 'document',
+            originalName: 'report.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: 1024,
+            createdAt: '2026-03-20T00:01:01.000Z'
+          }
+        ]
+      },
+      {
+        id: 'message-assistant',
+        conversationId: 'conversation-1',
+        role: 'assistant',
+        content: 'The report focuses on deployment, storage policies, and admin access.',
+        model: 'gemini-2.5-flash',
+        status: 'completed',
+        createdAt: '2026-03-20T00:01:05.000Z',
+        attachments: []
+      }
+    ])
   })
 
   it('rolls back the user message when attachment persistence fails', async () => {

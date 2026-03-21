@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ConversationDetail } from '#shared/types/chat'
+import type { ConversationSummary } from '#shared/types/chat'
 
 const props = defineProps<{
-  conversation: ConversationDetail | null
+  conversation: ConversationSummary | null
   pending: boolean
 }>()
 

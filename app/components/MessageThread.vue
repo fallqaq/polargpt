@@ -1,16 +1,45 @@
 <script setup lang="ts">
-import type { ChatMessage } from '#shared/types/chat'
+import type { AttachmentRecord, ChatMessage } from '#shared/types/chat'
 import { formatBytes } from '#shared/utils/files'
 
+interface DisplayAttachment extends AttachmentRecord {
+  downloadUrl: string | null
+  urlPending: boolean
+}
+
+interface DisplayMessage extends Omit<ChatMessage, 'attachments'> {
+  attachments: DisplayAttachment[]
+}
+
 const props = defineProps<{
-  messages: ChatMessage[]
+  messages: DisplayMessage[]
   pending: boolean
+  loading: boolean
+  hasOlderMessages: boolean
+  loadingOlder: boolean
+}>()
+
+defineEmits<{
+  loadOlder: []
+  openAttachment: [attachmentId: string]
 }>()
 
 const { formatDateTime, t } = useUiPreferences()
 const scroller = ref<HTMLElement | null>(null)
 
-watch(() => props.messages.length, async () => {
+function resolveMessageContent(message: DisplayMessage) {
+  if (message.role === 'assistant' && message.id.startsWith('temp-') && !message.content.trim()) {
+    return t('threadGenerating')
+  }
+
+  return message.content || t('threadNoTextContent')
+}
+
+watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
+  if (nextLength <= previousLength) {
+    return
+  }
+
   await nextTick()
 
   if (scroller.value) {
@@ -21,7 +50,22 @@ watch(() => props.messages.length, async () => {
 
 <template>
   <section ref="scroller" class="thread panel">
-    <div v-if="props.messages.length === 0" class="thread__empty">
+    <button
+      v-if="props.hasOlderMessages"
+      class="button button--ghost thread__older"
+      type="button"
+      :disabled="props.loadingOlder"
+      @click="$emit('loadOlder')"
+    >
+      {{ props.loadingOlder ? t('threadLoadOlderBusy') : t('threadLoadOlder') }}
+    </button>
+
+    <div v-if="props.loading && props.messages.length === 0" class="thread__empty">
+      <p class="surface-label">{{ t('threadReadyLabel') }}</p>
+      <h3>{{ t('threadLoadingConversation') }}</h3>
+    </div>
+
+    <div v-else-if="props.messages.length === 0" class="thread__empty">
       <p class="surface-label">{{ t('threadReadyLabel') }}</p>
       <h3>{{ t('threadEmptyTitle') }}</h3>
       <p class="empty-copy">
@@ -39,28 +83,35 @@ watch(() => props.messages.length, async () => {
         <span class="thread__timestamp">{{ formatDateTime(message.createdAt) }}</span>
       </div>
 
-      <pre class="thread__content">{{ message.content || t('threadNoTextContent') }}</pre>
+      <pre class="thread__content">{{ resolveMessageContent(message) }}</pre>
 
       <div v-if="message.attachments.length > 0" class="thread__attachments">
-        <a
+        <component
+          :is="attachment.downloadUrl ? 'a' : 'button'"
           v-for="attachment in message.attachments"
           :key="attachment.id"
           class="thread__attachment"
           :href="attachment.downloadUrl ?? undefined"
           :target="attachment.downloadUrl ? '_blank' : undefined"
+          :type="attachment.downloadUrl ? undefined : 'button'"
           rel="noreferrer"
+          @click="attachment.downloadUrl ? undefined : $emit('openAttachment', attachment.id)"
         >
           <img
             v-if="attachment.kind === 'image' && attachment.downloadUrl"
             class="thread__preview"
             :src="attachment.downloadUrl"
             :alt="attachment.originalName"
+            loading="lazy"
           >
           <div class="thread__attachment-meta">
             <strong>{{ attachment.originalName }}</strong>
             <span>{{ attachment.mimeType }} · {{ formatBytes(attachment.sizeBytes) }}</span>
+            <span v-if="!attachment.downloadUrl">
+              {{ attachment.urlPending ? t('threadResolveAttachment') : t('threadOpenAttachment') }}
+            </span>
           </div>
-        </a>
+        </component>
       </div>
     </article>
 
@@ -78,6 +129,10 @@ watch(() => props.messages.length, async () => {
   max-height: 100%;
   overflow-y: auto;
   padding: 22px;
+}
+
+.thread__older {
+  justify-self: center;
 }
 
 .thread__empty {
@@ -142,6 +197,8 @@ watch(() => props.messages.length, async () => {
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-surface-strong);
+  text-align: left;
+  color: inherit;
 }
 
 .thread__preview {

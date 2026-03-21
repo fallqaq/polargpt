@@ -1,5 +1,10 @@
 import type { AttachmentRow, ConversationRow, MessageRow } from '../types/database'
-import type { AttachmentRecord, ChatMessage, ConversationDetail, ConversationSummary } from '#shared/types/chat'
+import type {
+  AttachmentRecord,
+  ChatMessage,
+  ConversationMessagesPage,
+  ConversationSummary
+} from '#shared/types/chat'
 
 export function mapConversationSummary(row: ConversationRow): ConversationSummary {
   return {
@@ -12,7 +17,7 @@ export function mapConversationSummary(row: ConversationRow): ConversationSummar
   }
 }
 
-export function mapAttachmentRecord(row: AttachmentRow, downloadUrl: string | null): AttachmentRecord {
+export function mapAttachmentRecord(row: AttachmentRow): AttachmentRecord {
   return {
     id: row.id,
     messageId: row.message_id,
@@ -20,16 +25,28 @@ export function mapAttachmentRecord(row: AttachmentRow, downloadUrl: string | nu
     originalName: row.original_name,
     mimeType: row.mime_type,
     sizeBytes: row.size_bytes,
-    createdAt: row.created_at,
-    downloadUrl
+    createdAt: row.created_at
   }
 }
 
-export function mapMessageRecord(
-  row: MessageRow,
-  attachments: AttachmentRow[],
-  signedUrls: Map<string, string | null>
-): ChatMessage {
+export function groupAttachmentsByMessageId(attachments: AttachmentRow[]) {
+  const grouped = new Map<string, AttachmentRow[]>()
+
+  for (const attachment of attachments) {
+    const current = grouped.get(attachment.message_id)
+
+    if (current) {
+      current.push(attachment)
+    }
+    else {
+      grouped.set(attachment.message_id, [attachment])
+    }
+  }
+
+  return grouped
+}
+
+export function mapMessageRecord(row: MessageRow, attachments: AttachmentRow[]): ChatMessage {
   return {
     id: row.id,
     conversationId: row.conversation_id,
@@ -38,20 +55,22 @@ export function mapMessageRecord(
     model: row.model,
     status: row.status,
     createdAt: row.created_at,
-    attachments: attachments
-      .filter((attachment) => attachment.message_id === row.id)
-      .map((attachment) => mapAttachmentRecord(attachment, signedUrls.get(attachment.id) ?? null))
+    attachments: attachments.map(mapAttachmentRecord)
   }
 }
 
-export function mapConversationDetail(input: {
-  conversation: ConversationRow
+export function mapConversationMessagesPage(input: {
+  conversationId: string
   messages: MessageRow[]
-  attachments: AttachmentRow[]
-  signedUrls: Map<string, string | null>
-}): ConversationDetail {
+  attachmentsByMessageId: Map<string, AttachmentRow[]>
+  nextCursor: string | null
+  limit: number
+}): ConversationMessagesPage {
   return {
-    ...mapConversationSummary(input.conversation),
-    messages: input.messages.map((message) => mapMessageRecord(message, input.attachments, input.signedUrls))
+    conversationId: input.conversationId,
+    messages: input.messages.map((message) =>
+      mapMessageRecord(message, input.attachmentsByMessageId.get(message.id) ?? [])),
+    nextCursor: input.nextCursor,
+    limit: input.limit
   }
 }

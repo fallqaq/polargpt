@@ -20,7 +20,6 @@ export interface AttachmentRecord {
   mimeType: string
   sizeBytes: number
   createdAt: string
-  downloadUrl: string | null
 }
 
 export interface ChatMessage {
@@ -34,8 +33,16 @@ export interface ChatMessage {
   attachments: AttachmentRecord[]
 }
 
-export interface ConversationDetail extends ConversationSummary {
+export interface ConversationMessagesPage {
+  conversationId: string
   messages: ChatMessage[]
+  nextCursor: string | null
+  limit: number
+}
+
+export interface AttachmentUrlRecord {
+  attachmentId: string
+  downloadUrl: string | null
 }
 
 export interface LoginResponse {
@@ -46,10 +53,24 @@ export interface ConversationListResponse {
   conversations: ConversationSummary[]
 }
 
-export interface ConversationDetailResponse {
-  conversation: ConversationDetail
+export interface ConversationDetailPageResponse {
+  conversation: ConversationSummary
+  page: ConversationMessagesPage
+}
+
+export interface ConversationMessagesPageResponse {
+  page: ConversationMessagesPage
 }
 
 export interface ConversationSummaryResponse {
   conversation: ConversationSummary
+}
+
+export interface SendMessageDeltaResponse {
+  conversation: ConversationSummary
+  appendedMessages: ChatMessage[]
+}
+
+export interface AttachmentUrlResponse {
+  attachments: AttachmentUrlRecord[]
 }

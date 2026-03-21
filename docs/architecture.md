@@ -16,13 +16,15 @@ polarGPT is structured as a Nuxt 4 SSR app with a clear backend-for-frontend bou
 3. Initial page protection happens in `server/middleware/page-auth.ts`.
 4. API protection happens in `server/middleware/admin-auth.ts`.
 5. Chat and history UI call the admin API only; the browser never connects to Supabase directly.
-6. Message submission stores attachments in Supabase Storage, registers them with Gemini, persists database rows, and finally requests the assistant answer from Gemini.
+6. Conversation pages now load incrementally: the shell fetches summaries first, then the latest message page for the active conversation.
+7. Message submission stores attachments in Supabase Storage, registers them with Gemini, persists database rows, and finally requests the assistant answer from Gemini.
+8. Attachment download URLs are signed on demand instead of being embedded in every conversation payload.
 
 ## Data Boundaries
 
 - Supabase service role access exists only on the server.
 - Gemini API access exists only on the server.
-- Storage downloads are signed per request and short-lived.
+- Storage downloads are signed on demand and short-lived.
 - Shared types in `shared/types/chat.ts` define the client-facing response contracts.
 
 ## Security Notes

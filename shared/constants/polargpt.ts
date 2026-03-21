@@ -12,7 +12,8 @@ export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
 export const ADMIN_SESSION_COOKIE_NAME = 'polargpt_admin_session'
 export const ADMIN_HINT_COOKIE_NAME = 'polargpt_admin_hint'
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
-export const SIGNED_ATTACHMENT_URL_TTL_SECONDS = 60
+export const SIGNED_ATTACHMENT_URL_TTL_SECONDS = 60 * 5
+export const DEFAULT_MESSAGES_PAGE_LIMIT = 50
 
 export type SupportedAttachmentKind = 'image' | 'document'
 
