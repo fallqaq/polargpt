@@ -34,7 +34,7 @@ function cancelEditing() {
   editing.value = false
 }
 
-async function submitRename() {
+function submitRename() {
   const title = draftTitle.value.trim()
 
   if (!title || title === props.conversation?.title) {
@@ -53,7 +53,7 @@ async function submitRename() {
       <p class="surface-label">{{ t('headerWorkspaceLabel') }}</p>
 
       <template v-if="props.conversation">
-        <div v-if="editing" class="conversation-header__edit">
+        <div v-if="editing" class="conversation-header__edit panel">
           <input
             v-model="draftTitle"
             class="text-input"
@@ -62,10 +62,12 @@ async function submitRename() {
             @keydown.enter.prevent="submitRename"
             @keydown.esc.prevent="cancelEditing"
           >
-          <button class="button button--ghost" type="button" @click="cancelEditing">{{ t('headerCancel') }}</button>
-          <button class="button" type="button" @click="submitRename">
-            {{ t('headerSave') }}
-          </button>
+          <div class="conversation-header__edit-actions">
+            <button class="button button--ghost" type="button" @click="cancelEditing">{{ t('headerCancel') }}</button>
+            <button class="button" type="button" @click="submitRename">
+              {{ t('headerSave') }}
+            </button>
+          </div>
         </div>
 
         <div v-else class="conversation-header__summary">
@@ -83,7 +85,7 @@ async function submitRename() {
     <div class="conversation-header__actions">
       <button
         v-if="props.conversation && !editing"
-        class="button button--ghost"
+        class="button button--ghost conversation-header__action"
         type="button"
         :disabled="props.pending"
         @click="startEditing"
@@ -92,14 +94,16 @@ async function submitRename() {
       </button>
       <button
         v-if="props.conversation"
-        class="button button--danger"
+        class="button button--ghost conversation-header__action"
         type="button"
         :disabled="props.pending"
         @click="$emit('delete')"
       >
         {{ t('headerDelete') }}
       </button>
-      <button class="button button--ghost" type="button" @click="$emit('logout')">{{ t('headerLogout') }}</button>
+      <button class="button button--ghost conversation-header__action" type="button" @click="$emit('logout')">
+        {{ t('headerLogout') }}
+      </button>
     </div>
   </header>
 </template>
@@ -108,40 +112,68 @@ async function submitRename() {
 .conversation-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 20px;
-  align-items: flex-start;
+  gap: 18px;
+  align-items: end;
+  width: min(100%, 980px);
+  margin: 0 auto;
+}
+
+.conversation-header__summary {
+  display: grid;
+  gap: 8px;
 }
 
 .conversation-header__summary h2 {
-  margin: 10px 0 10px;
-  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  margin: 0;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .conversation-header__summary p {
   margin: 0;
-  max-width: 46rem;
+  max-width: 48rem;
   color: var(--color-muted);
-  line-height: 1.7;
+  line-height: 1.6;
+  font-size: 0.92rem;
 }
 
 .conversation-header__actions,
-.conversation-header__edit {
+.conversation-header__edit-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.conversation-header__action {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .conversation-header__edit {
-  align-items: center;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  width: min(100%, 34rem);
+  border-radius: 24px;
 }
 
 .conversation-header__edit .text-input {
-  min-width: min(26rem, 60vw);
+  min-height: 44px;
 }
 
 @media (max-width: 960px) {
   .conversation-header {
     grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .conversation-header__actions,
+  .conversation-header__edit-actions {
+    justify-content: flex-start;
   }
 }
 </style>

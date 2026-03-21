@@ -66,51 +66,64 @@ const themeOptions = computed<Array<{ value: UiTheme, label: string }>>(() => [
 
 <style scoped>
 .toolbar {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 14px;
-  padding: 14px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 24px;
 }
 
 .toolbar__group {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .toolbar__segmented {
   display: inline-flex;
-  padding: 4px;
-  border: 1px solid var(--color-border);
+  padding: 3px;
+  border: 1px solid var(--color-hairline);
   border-radius: 999px;
   background: var(--color-toolbar-track);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 .toolbar__option {
-  min-width: 5.25rem;
-  min-height: 40px;
+  min-width: 4.5rem;
+  min-height: 34px;
   border: 0;
   border-radius: 999px;
-  padding: 0 16px;
+  padding: 0 14px;
   background: transparent;
   color: var(--color-muted);
+  font-size: 0.82rem;
   font-weight: 600;
-  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+  letter-spacing: 0.01em;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .toolbar__option--active {
   color: var(--color-ink);
   background: var(--color-toolbar-active);
-  box-shadow: inset 0 0 0 1px var(--color-toolbar-active-border);
+  box-shadow:
+    inset 0 0 0 1px var(--color-toolbar-active-border),
+    0 8px 18px rgba(77, 90, 136, 0.12);
 }
 
 .toolbar__option:hover {
   transform: translateY(-1px);
 }
 
+.toolbar :deep(.surface-label) {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+}
+
 @media (max-width: 760px) {
   .toolbar {
-    justify-content: stretch;
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 20px;
   }
 
   .toolbar__group {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRequestErrorMessage } from '@/app/utils/request-errors'
 import {
+  resolveEnglishUiText,
   resolveUiText,
   resolveUiTheme,
   translateKnownErrorMessage
@@ -10,6 +11,11 @@ describe('app ui utilities', () => {
   it('renders translated copy with interpolation', () => {
     expect(resolveUiText('zh-CN', 'composerHint', { count: 4 })).toContain('4')
     expect(resolveUiText('en-US', 'toolbarThemeDark')).toBe('Dark')
+  })
+
+  it('can force decorative copy to remain in English', () => {
+    expect(resolveEnglishUiText('loginTitle')).toBe('polarGPT control room')
+    expect(resolveEnglishUiText('threadEmptyTitle')).toBe('Start with a direct prompt or upload context first.')
   })
 
   it('resolves the theme from the stored preference or system fallback', () => {

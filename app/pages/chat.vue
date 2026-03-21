@@ -119,34 +119,38 @@ async function handleOpenAttachment(attachmentId: string) {
     />
 
     <section class="workspace__main">
-      <ConversationHeader
-        :conversation="chat.activeConversation.value"
-        :pending="chat.conversationPending.value || chat.sendPending.value"
-        @rename="handleRename"
-        @delete="handleDelete(chat.currentConversationId.value)"
-        @logout="chat.logout"
-      />
+      <div class="workspace__stage">
+        <ConversationHeader
+          :conversation="chat.activeConversation.value"
+          :pending="chat.conversationPending.value || chat.sendPending.value"
+          @rename="handleRename"
+          @delete="handleDelete(chat.currentConversationId.value)"
+          @logout="chat.logout"
+        />
 
-      <p v-if="chat.errorMessage.value" class="status-banner">
-        {{ chat.errorMessage.value }}
-      </p>
+        <p v-if="chat.errorMessage.value" class="status-banner workspace__status">
+          {{ chat.errorMessage.value }}
+        </p>
 
-      <MessageThread
-        :messages="chat.activeMessages.value"
-        :pending="chat.sendPending.value"
-        :loading="chat.conversationPending.value"
-        :has-older-messages="chat.hasOlderMessages.value"
-        :loading-older="chat.loadingOlderMessages.value"
-        @load-older="chat.loadOlderMessages"
-        @open-attachment="handleOpenAttachment"
-      />
+        <MessageThread
+          :messages="chat.activeMessages.value"
+          :pending="chat.sendPending.value"
+          :loading="chat.conversationPending.value"
+          :has-older-messages="chat.hasOlderMessages.value"
+          :loading-older="chat.loadingOlderMessages.value"
+          @load-older="chat.loadOlderMessages"
+          @open-attachment="handleOpenAttachment"
+        />
+      </div>
 
-      <ChatComposer
-        v-model:text="draftText"
-        v-model:files="draftFiles"
-        :busy="chat.sendPending.value"
-        @submit="handleSubmit"
-      />
+      <div class="workspace__dock">
+        <ChatComposer
+          v-model:text="draftText"
+          v-model:files="draftFiles"
+          :busy="chat.sendPending.value"
+          @submit="handleSubmit"
+        />
+      </div>
     </section>
   </section>
 </template>
@@ -154,16 +158,34 @@ async function handleOpenAttachment(attachmentId: string) {
 <style scoped>
 .workspace {
   display: grid;
-  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(16.5rem, 20rem) minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 28px);
   min-height: 100%;
 }
 
 .workspace__main {
   display: grid;
-  grid-template-rows: auto auto minmax(18rem, 1fr) auto;
-  gap: 18px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
   min-width: 0;
+  min-height: 0;
+}
+
+.workspace__stage {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.workspace__status {
+  width: min(100%, 980px);
+  margin: 0 auto;
+}
+
+.workspace__dock {
+  position: relative;
+  padding-bottom: 4px;
 }
 
 @media (max-width: 1080px) {
@@ -172,7 +194,7 @@ async function handleOpenAttachment(attachmentId: string) {
   }
 
   .workspace__main {
-    grid-template-rows: auto auto minmax(24rem, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 }
 </style>

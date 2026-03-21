@@ -7,6 +7,7 @@ import {
   normalizeUiLocale,
   normalizeUiTheme,
   resolveUiText,
+  resolveEnglishUiText,
   resolveUiTheme,
   translateKnownErrorMessage,
   type UiLocale,
@@ -101,6 +102,10 @@ export function useUiPreferences() {
     return resolveUiText(locale.value, key, params)
   }
 
+  function tEn(key: UiTextKey, params?: UiTextParams) {
+    return resolveEnglishUiText(key, params)
+  }
+
   function formatDateTime(value: string | number | Date, options?: Intl.DateTimeFormatOptions) {
     return new Intl.DateTimeFormat(locale.value, options).format(new Date(value))
   }
@@ -118,6 +123,7 @@ export function useUiPreferences() {
     setLocale,
     setTheme,
     t,
+    tEn,
     formatDateTime,
     translateError
   }

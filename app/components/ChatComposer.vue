@@ -65,11 +65,12 @@ function submit() {
 
 <template>
   <div class="composer panel">
-    <div class="composer__top">
+    <div class="composer__head">
       <div>
         <p class="surface-label">{{ t('composerPromptLabel') }}</p>
         <h3>{{ t('composerTitle') }}</h3>
       </div>
+
       <label class="button button--ghost composer__upload">
         {{ t('composerAttachFiles') }}
         <input
@@ -84,7 +85,7 @@ function submit() {
 
     <textarea
       v-model="draftText"
-      class="textarea-input"
+      class="textarea-input composer__textarea"
       :placeholder="t('composerPlaceholder')"
       :disabled="props.busy"
       @keydown.meta.enter.prevent="submit"
@@ -110,7 +111,7 @@ function submit() {
         {{ t('composerHint', { count: MAX_ATTACHMENTS_PER_MESSAGE }) }}
       </p>
       <button
-        class="button"
+        class="button composer__submit"
         type="button"
         :disabled="props.busy || (!draftText.trim() && draftFiles.length === 0)"
         @click="submit"
@@ -124,30 +125,46 @@ function submit() {
 <style scoped>
 .composer {
   display: grid;
-  gap: 18px;
-  padding: 20px;
+  gap: 16px;
+  width: min(100%, 1020px);
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: 32px;
 }
 
-.composer__top {
+.composer__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
 
-.composer__top h3 {
-  margin: 10px 0 0;
-  font-size: 1.2rem;
+.composer__head h3 {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.composer__upload,
+.composer__submit {
+  min-height: 40px;
+  padding-inline: 14px;
+  font-size: 0.84rem;
 }
 
 .composer__upload {
   flex-shrink: 0;
 }
 
+.composer__textarea {
+  min-height: 150px;
+  border-radius: 28px;
+}
+
 .composer__files {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .composer__file {
@@ -157,6 +174,7 @@ function submit() {
   gap: 12px;
   min-width: min(18rem, 100%);
   padding: 12px 14px;
+  border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-surface-soft);
 }
@@ -164,34 +182,45 @@ function submit() {
 .composer__file p {
   margin: 6px 0 0;
   color: var(--color-muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .composer__file button {
   border: 0;
   background: transparent;
   color: var(--color-signal);
+  font-size: 0.82rem;
 }
 
 .composer__actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
 
 .composer__hint {
   margin: 0;
   color: var(--color-muted);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-family: var(--font-mono);
 }
 
 @media (max-width: 760px) {
-  .composer__top,
+  .composer {
+    border-radius: 28px;
+    padding: 14px;
+  }
+
+  .composer__head,
   .composer__actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .composer__upload,
+  .composer__submit {
+    width: 100%;
   }
 }
 </style>

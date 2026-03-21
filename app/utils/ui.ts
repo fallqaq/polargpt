@@ -33,6 +33,8 @@ const zhMessages = {
   sidebarSearchPlaceholder: '搜索标题和摘要',
   sidebarLoading: '正在加载会话...',
   sidebarEmpty: '还没有会话。点击上方按钮开始一个新对话。',
+  sidebarGroupToday: '今天',
+  sidebarGroupLast30Days: '30 天内',
   sidebarNoMessagesYet: '暂无消息',
   sidebarNoSummaryYet: '暂未生成摘要。',
   sidebarDeleteConversationAria: '删除会话',
@@ -122,6 +124,8 @@ const enMessages: Record<keyof typeof zhMessages, string> = {
   sidebarSearchPlaceholder: 'Search titles and summaries',
   sidebarLoading: 'Loading conversations...',
   sidebarEmpty: 'No conversations yet. Start a new one from the button above.',
+  sidebarGroupToday: 'Today',
+  sidebarGroupLast30Days: 'Last 30 Days',
   sidebarNoMessagesYet: 'No messages yet',
   sidebarNoSummaryYet: 'No summary yet.',
   sidebarDeleteConversationAria: 'Delete conversation',
@@ -275,12 +279,20 @@ export function resolveUiTheme(value: string | null | undefined, systemPrefersDa
   return normalizeUiTheme(value) ?? (systemPrefersDark ? 'dark' : 'light')
 }
 
-export function resolveUiText(locale: UiLocale, key: UiTextKey, params: UiTextParams = {}) {
+export function resolveUiTextForLocale(locale: UiLocale, key: UiTextKey, params: UiTextParams = {}) {
   const template = uiMessages[locale][key]
 
   return template.replace(/\{(\w+)\}/g, (_, paramKey: string) => {
     return String(params[paramKey] ?? `{${paramKey}}`)
   })
+}
+
+export function resolveUiText(locale: UiLocale, key: UiTextKey, params: UiTextParams = {}) {
+  return resolveUiTextForLocale(locale, key, params)
+}
+
+export function resolveEnglishUiText(key: UiTextKey, params: UiTextParams = {}) {
+  return resolveUiTextForLocale('en-US', key, params)
 }
 
 export function translateKnownErrorMessage(
@@ -291,13 +303,13 @@ export function translateKnownErrorMessage(
   const normalizedMessage = message?.trim()
 
   if (!normalizedMessage) {
-    return resolveUiText(locale, fallbackKey)
+    return resolveUiTextForLocale(locale, fallbackKey)
   }
 
   const exactKey = EXACT_ERROR_MESSAGE_KEYS[normalizedMessage]
 
   if (exactKey) {
-    return resolveUiText(locale, exactKey)
+    return resolveUiTextForLocale(locale, exactKey)
   }
 
   for (const entry of ERROR_MESSAGE_PATTERNS) {
@@ -305,7 +317,7 @@ export function translateKnownErrorMessage(
 
     if (match) {
       const { key, params } = entry.resolve(match)
-      return resolveUiText(locale, key, params)
+      return resolveUiTextForLocale(locale, key, params)
     }
   }
 

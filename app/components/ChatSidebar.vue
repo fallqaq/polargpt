@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { ConversationSummary } from '#shared/types/chat'
 
+interface ConversationGroup {
+  key: string
+  label: string
+  conversations: ConversationSummary[]
+}
+
 const props = defineProps<{
   conversations: ConversationSummary[]
   activeConversationId: string | null
@@ -28,17 +34,75 @@ function formatTimestamp(value: string | null) {
     month: 'short'
   })
 }
+
+function resolveGroupKey(value: string) {
+  const date = new Date(value)
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diffDays = Math.floor((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000)
+
+  if (diffDays <= 0) {
+    return {
+      key: 'today',
+      label: t('sidebarGroupToday')
+    }
+  }
+
+  if (diffDays < 30) {
+    return {
+      key: 'last-30-days',
+      label: t('sidebarGroupLast30Days')
+    }
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+
+  return {
+    key: `${year}-${month}`,
+    label: `${year}-${month}`
+  }
+}
+
+const groupedConversations = computed<ConversationGroup[]>(() => {
+  const groups = new Map<string, ConversationGroup>()
+
+  for (const conversation of props.conversations) {
+    const reference = conversation.lastMessageAt ?? conversation.updatedAt
+    const group = resolveGroupKey(reference)
+    const existingGroup = groups.get(group.key)
+
+    if (existingGroup) {
+      existingGroup.conversations.push(conversation)
+      continue
+    }
+
+    groups.set(group.key, {
+      key: group.key,
+      label: group.label,
+      conversations: [conversation]
+    })
+  }
+
+  return Array.from(groups.values())
+})
 </script>
 
 <template>
   <aside class="sidebar panel">
     <div class="sidebar__head">
-      <div>
-        <p class="surface-label">{{ t('sidebarHistoryLabel') }}</p>
-        <h1 class="sidebar__title">polarGPT</h1>
+      <div class="sidebar__brand">
+        <span class="sidebar__brand-mark" aria-hidden="true" />
+        <div>
+          <p class="surface-label">{{ t('sidebarHistoryLabel') }}</p>
+          <h1 class="sidebar__title">polarGPT</h1>
+        </div>
       </div>
-      <button class="button" type="button" @click="$emit('create')">
-        {{ t('sidebarNewChat') }}
+
+      <button class="button sidebar__new" type="button" @click="$emit('create')">
+        <span class="sidebar__plus" aria-hidden="true">+</span>
+        <span>{{ t('sidebarNewChat') }}</span>
       </button>
     </div>
 
@@ -66,35 +130,45 @@ function formatTimestamp(value: string | null) {
           {{ t('sidebarLoading') }}
         </p>
 
-        <article
-          v-for="conversation in props.conversations"
-          :key="conversation.id"
-          :class="[
-            'sidebar__conversation',
-            conversation.id === props.activeConversationId && 'sidebar__conversation--active'
-          ]"
+        <section
+          v-for="group in groupedConversations"
+          :key="group.key"
+          class="sidebar__group"
         >
-          <button
-            class="sidebar__conversation-main"
-            type="button"
-            @click="$emit('select', conversation.id)"
-          >
-            <div class="sidebar__conversation-header">
-              <strong>{{ conversation.title }}</strong>
-              <time>{{ formatTimestamp(conversation.lastMessageAt ?? conversation.updatedAt) }}</time>
-            </div>
-            <p>{{ conversation.summary || t('sidebarNoSummaryYet') }}</p>
-          </button>
+          <p class="sidebar__group-label">
+            {{ group.label }}
+          </p>
 
-          <button
-            class="sidebar__delete"
-            type="button"
-            :aria-label="t('sidebarDeleteConversationAria')"
-            @click="$emit('delete', conversation.id)"
+          <article
+            v-for="conversation in group.conversations"
+            :key="conversation.id"
+            :class="[
+              'sidebar__conversation',
+              conversation.id === props.activeConversationId && 'sidebar__conversation--active'
+            ]"
           >
-            {{ t('sidebarDelete') }}
-          </button>
-        </article>
+            <button
+              class="sidebar__conversation-main"
+              type="button"
+              @click="$emit('select', conversation.id)"
+            >
+              <div class="sidebar__conversation-header">
+                <strong>{{ conversation.title }}</strong>
+                <time>{{ formatTimestamp(conversation.lastMessageAt ?? conversation.updatedAt) }}</time>
+              </div>
+              <p>{{ conversation.summary || t('sidebarNoSummaryYet') }}</p>
+            </button>
+
+            <button
+              class="sidebar__delete"
+              type="button"
+              :aria-label="t('sidebarDeleteConversationAria')"
+              @click="$emit('delete', conversation.id)"
+            >
+              {{ t('sidebarDelete') }}
+            </button>
+          </article>
+        </section>
       </template>
     </div>
   </aside>
@@ -104,33 +178,88 @@ function formatTimestamp(value: string | null) {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   min-height: 0;
-  padding: 22px;
+  padding: 18px;
+  border-radius: 32px;
 }
 
 .sidebar__head {
+  display: grid;
+  gap: 14px;
+}
+
+.sidebar__brand {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar__brand-mark {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.92), transparent 26%),
+    linear-gradient(135deg, #7f95ff 0%, #4a67ff 100%);
+  box-shadow: 0 10px 22px rgba(84, 105, 205, 0.22);
 }
 
 .sidebar__title {
-  margin: 10px 0 0;
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
-  line-height: 0.95;
+  margin: 6px 0 0;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.sidebar__new {
+  width: 100%;
+  justify-content: center;
+  min-height: 48px;
+  color: var(--color-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 64%),
+    rgba(255, 255, 255, 0.54);
+}
+
+.sidebar__plus {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-signal-soft);
+  color: var(--color-signal);
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .sidebar__search {
   display: block;
 }
 
+.sidebar__search .text-input {
+  min-height: 42px;
+  font-size: 0.9rem;
+}
+
 .sidebar__body {
   display: grid;
-  gap: 14px;
+  gap: 18px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.sidebar__group {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar__group-label {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .sidebar__state {
@@ -142,16 +271,27 @@ function formatTimestamp(value: string | null) {
 .sidebar__conversation {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid transparent;
   border-radius: 20px;
-  background: var(--color-surface-soft);
+  background: transparent;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.sidebar__conversation:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .sidebar__conversation--active {
-  border-color: var(--color-toolbar-active-border);
-  background: var(--color-accent-soft);
+  border-color: rgba(140, 158, 214, 0.18);
+  background: rgba(212, 224, 255, 0.56);
+  box-shadow: 0 12px 24px rgba(132, 146, 187, 0.12);
+}
+
+html[data-theme='dark'] .sidebar__conversation--active {
+  background: rgba(53, 71, 118, 0.46);
 }
 
 .sidebar__conversation-main,
@@ -163,45 +303,56 @@ function formatTimestamp(value: string | null) {
 
 .sidebar__conversation-main {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   text-align: left;
+  min-width: 0;
+  padding: 8px 10px;
 }
 
 .sidebar__conversation-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
 .sidebar__conversation-header strong {
-  font-size: 0.98rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.94rem;
 }
 
 .sidebar__conversation-header time {
   color: var(--color-muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-family: var(--font-mono);
+  flex-shrink: 0;
 }
 
 .sidebar__conversation-main p {
+  display: -webkit-box;
   margin: 0;
+  overflow: hidden;
   color: var(--color-muted);
-  line-height: 1.55;
-  font-size: 0.92rem;
+  line-height: 1.45;
+  font-size: 0.82rem;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .sidebar__delete {
-  align-self: flex-start;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 34px;
+  padding: 0 10px;
   border-radius: 999px;
   color: var(--color-danger-soft);
+  font-size: 0.76rem;
 }
 
 @media (max-width: 1080px) {
   .sidebar {
-    padding: 18px;
+    border-radius: 28px;
   }
 }
 </style>
