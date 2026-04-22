@@ -23,6 +23,16 @@ import type {
 import { removeStoredAttachments } from './attachment-service'
 
 const MAX_MESSAGES_PAGE_LIMIT = 100
+type ConversationSchemaMode = 'unknown' | 'multi-user' | 'legacy'
+
+let cachedConversationSchemaMode: ConversationSchemaMode = 'unknown'
+
+const CONVERSATION_SELECT = 'id, user_id, title, summary, created_at, updated_at, last_message_at'
+const LEGACY_CONVERSATION_SELECT = 'id, title, summary, created_at, updated_at, last_message_at'
+const MESSAGE_SELECT = 'id, user_id, conversation_id, role, content, model, status, created_at'
+const LEGACY_MESSAGE_SELECT = 'id, conversation_id, role, content, model, status, created_at'
+const ATTACHMENT_SELECT = 'id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at'
+const LEGACY_ATTACHMENT_SELECT = 'id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, created_at'
 
 function normalizeMessagesPageLimit(limit?: number | null) {
   if (!limit || Number.isNaN(limit)) {
@@ -45,28 +55,126 @@ function requireAuthenticatedUserId(event?: H3Event) {
   return userId
 }
 
+function getErrorCode(error: unknown) {
+  return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : ''
+}
+
+function getErrorMessage(error: unknown) {
+  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+    ? error.message.toLowerCase()
+    : ''
+}
+
+export function isLegacySchemaUserScopeError(error: unknown) {
+  const code = getErrorCode(error)
+  const message = getErrorMessage(error)
+
+  if (code === '42703' && message.includes('user_id')) {
+    return true
+  }
+
+  return code === 'PGRST204' && message.includes('user_id')
+}
+
+export function isMissingClaimLegacyRpcError(error: unknown) {
+  const code = getErrorCode(error)
+  const message = getErrorMessage(error)
+
+  return (
+    (code === '42883' || code === 'PGRST202')
+    && message.includes('claim_legacy_chat_records')
+  )
+}
+
+export function isLegacyAttachmentExtractedTextError(error: unknown) {
+  const code = getErrorCode(error)
+  const message = getErrorMessage(error)
+
+  if (code === '42703' && message.includes('extracted_text')) {
+    return true
+  }
+
+  return code === 'PGRST204' && message.includes('extracted_text')
+}
+
+function getConversationSelect(legacySchema: boolean) {
+  return legacySchema ? LEGACY_CONVERSATION_SELECT : CONVERSATION_SELECT
+}
+
+function getMessageSelect(legacySchema: boolean) {
+  return legacySchema ? LEGACY_MESSAGE_SELECT : MESSAGE_SELECT
+}
+
+function getAttachmentSelect(legacySchema: boolean) {
+  return legacySchema ? LEGACY_ATTACHMENT_SELECT : ATTACHMENT_SELECT
+}
+
+function markSchemaMode(legacySchema: boolean) {
+  cachedConversationSchemaMode = legacySchema ? 'legacy' : 'multi-user'
+}
+
+function normalizeAttachmentRow(
+  row: Omit<AttachmentRow, 'user_id' | 'extracted_text'> & {
+    user_id?: string | null
+    extracted_text?: string | null
+  },
+  legacySchema: boolean
+): AttachmentRow {
+  return {
+    ...row,
+    user_id: legacySchema ? null : row.user_id ?? null,
+    extracted_text: row.extracted_text ?? null
+  }
+}
+
+async function runWithLegacySchemaFallback<T extends { error: unknown }>(
+  execute: (legacySchema: boolean) => Promise<T>
+) {
+  const preferLegacySchema = cachedConversationSchemaMode === 'legacy'
+  const initialResult = await execute(preferLegacySchema)
+
+  if (!initialResult.error) {
+    markSchemaMode(preferLegacySchema)
+    return initialResult
+  }
+
+  if (!preferLegacySchema && isLegacySchemaUserScopeError(initialResult.error)) {
+    markSchemaMode(true)
+    return execute(true)
+  }
+
+  return initialResult
+}
+
 function getConversationRepository(event?: H3Event) {
   const client = getSupabaseAdminClient()
   const userId = requireAuthenticatedUserId(event)
 
   return {
     async listConversations(searchQuery?: string) {
-      let request = client
-        .from('conversations')
-        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
-        .eq('user_id', userId)
-        .order('last_message_at', { ascending: false, nullsFirst: false })
-        .order('updated_at', { ascending: false })
+      const { data, error } = await runWithLegacySchemaFallback(async (legacySchema) => {
+        let request = client
+          .from('conversations')
+          .select(getConversationSelect(legacySchema))
+          .order('last_message_at', { ascending: false, nullsFirst: false })
+          .order('updated_at', { ascending: false })
 
-      if (searchQuery) {
-        const sanitized = searchQuery.replace(/[,%()]/g, ' ').trim()
-
-        if (sanitized) {
-          request = request.or(`title.ilike.%${sanitized}%,summary.ilike.%${sanitized}%`)
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
         }
-      }
 
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => request)
+        if (searchQuery) {
+          const sanitized = searchQuery.replace(/[,%()]/g, ' ').trim()
+
+          if (sanitized) {
+            request = request.or(`title.ilike.%${sanitized}%,summary.ilike.%${sanitized}%`)
+          }
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -75,22 +183,23 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data ?? []) as ConversationRow[]
+      return (data ?? []) as unknown as ConversationRow[]
     },
     async createConversation() {
       const now = new Date().toISOString()
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('conversations')
-        .insert({
-          user_id: userId,
-          title: DEFAULT_CONVERSATION_TITLE,
-          summary: '',
-          created_at: now,
-          updated_at: now,
-          last_message_at: null
-        })
-        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
-        .single())
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) =>
+        measureRequestMetric(event, 'dbMs', async () => client
+          .from('conversations')
+          .insert({
+            ...(!legacySchema ? { user_id: userId } : {}),
+            title: DEFAULT_CONVERSATION_TITLE,
+            summary: '',
+            created_at: now,
+            updated_at: now,
+            last_message_at: null
+          })
+          .select(getConversationSelect(legacySchema))
+          .single()))
 
       if (error || !data) {
         throw createError({
@@ -99,15 +208,21 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return data as ConversationRow
+      return data as unknown as ConversationRow
     },
     async getConversation(conversationId: string) {
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('conversations')
-        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
-        .eq('id', conversationId)
-        .eq('user_id', userId)
-        .maybeSingle())
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('conversations')
+          .select(getConversationSelect(legacySchema))
+          .eq('id', conversationId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request.maybeSingle())
+      })
 
       if (error) {
         throw createError({
@@ -116,15 +231,21 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data as ConversationRow | null) ?? null
+      return (data as unknown as ConversationRow | null) ?? null
     },
     async getMessage(messageId: string) {
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('messages')
-        .select('id, user_id, conversation_id, role, content, model, status, created_at')
-        .eq('id', messageId)
-        .eq('user_id', userId)
-        .maybeSingle())
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('messages')
+          .select(getMessageSelect(legacySchema))
+          .eq('id', messageId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request.maybeSingle())
+      })
 
       if (error) {
         throw createError({
@@ -133,15 +254,22 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data as MessageRow | null) ?? null
+      return (data as unknown as MessageRow | null) ?? null
     },
     async listMessages(conversationId: string) {
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('messages')
-        .select('id, user_id, conversation_id, role, content, model, status, created_at')
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true }))
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('messages')
+          .select(getMessageSelect(legacySchema))
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true })
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -150,7 +278,7 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data ?? []) as MessageRow[]
+      return (data ?? []) as unknown as MessageRow[]
     },
     async listMessagesPage(conversationId: string, input: {
       beforeMessageId?: string | null
@@ -172,19 +300,24 @@ function getConversationRepository(event?: H3Event) {
         beforeCreatedAt = cursorMessage.created_at
       }
 
-      let request = client
-        .from('messages')
-        .select('id, user_id, conversation_id, role, content, model, status, created_at')
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit + 1)
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('messages')
+          .select(getMessageSelect(legacySchema))
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })
+          .limit(limit + 1)
 
-      if (beforeCreatedAt) {
-        request = request.lt('created_at', beforeCreatedAt)
-      }
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
 
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => request)
+        if (beforeCreatedAt) {
+          request = request.lt('created_at', beforeCreatedAt)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -193,7 +326,7 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      const rows = (data ?? []) as MessageRow[]
+      const rows = (data ?? []) as unknown as MessageRow[]
       const hasOlder = rows.length > limit
       const selected = (hasOlder ? rows.slice(0, limit) : rows).reverse()
 
@@ -208,12 +341,19 @@ function getConversationRepository(event?: H3Event) {
         return [] as AttachmentRow[]
       }
 
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('attachments')
-        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at')
-        .eq('user_id', userId)
-        .in('message_id', messageIds)
-        .order('created_at', { ascending: true }))
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        const request = (client as any)
+          .from('attachments')
+          .select(getAttachmentSelect(legacySchema))
+          .in('message_id', messageIds)
+          .order('created_at', { ascending: true })
+
+        if (!legacySchema) {
+          return measureRequestMetric(event, 'dbMs', async () => request.eq('user_id', userId))
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -222,18 +362,28 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data ?? []) as AttachmentRow[]
+      const legacySchema = cachedConversationSchemaMode === 'legacy'
+
+      return ((data ?? []) as Array<Parameters<typeof normalizeAttachmentRow>[0]>)
+        .map((row) => normalizeAttachmentRow(row, legacySchema))
     },
     async listAttachmentsByIds(attachmentIds: string[]) {
       if (attachmentIds.length === 0) {
         return [] as AttachmentRow[]
       }
 
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('attachments')
-        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at')
-        .eq('user_id', userId)
-        .in('id', attachmentIds))
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        const request = (client as any)
+          .from('attachments')
+          .select(getAttachmentSelect(legacySchema))
+          .in('id', attachmentIds)
+
+        if (!legacySchema) {
+          return measureRequestMetric(event, 'dbMs', async () => request.eq('user_id', userId))
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -242,7 +392,10 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data ?? []) as AttachmentRow[]
+      const legacySchema = cachedConversationSchemaMode === 'legacy'
+
+      return ((data ?? []) as Array<Parameters<typeof normalizeAttachmentRow>[0]>)
+        .map((row) => normalizeAttachmentRow(row, legacySchema))
     },
     async insertMessage(input: {
       conversationId: string
@@ -252,19 +405,20 @@ function getConversationRepository(event?: H3Event) {
       status: MessageRow['status']
     }) {
       const now = new Date().toISOString()
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('messages')
-        .insert({
-          user_id: userId,
-          conversation_id: input.conversationId,
-          role: input.role,
-          content: input.content,
-          model: input.model ?? null,
-          status: input.status,
-          created_at: now
-        })
-        .select('id, user_id, conversation_id, role, content, model, status, created_at')
-        .single())
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) =>
+        measureRequestMetric(event, 'dbMs', async () => client
+          .from('messages')
+          .insert({
+            ...(!legacySchema ? { user_id: userId } : {}),
+            conversation_id: input.conversationId,
+            role: input.role,
+            content: input.content,
+            model: input.model ?? null,
+            status: input.status,
+            created_at: now
+          })
+          .select(getMessageSelect(legacySchema))
+          .single()))
 
       if (error || !data) {
         throw createError({
@@ -273,14 +427,21 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return data as MessageRow
+      return data as unknown as MessageRow
     },
     async deleteMessage(messageId: string) {
-      const { error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('messages')
-        .delete()
-        .eq('id', messageId)
-        .eq('user_id', userId))
+      const { error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('messages')
+          .delete()
+          .eq('id', messageId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -295,14 +456,25 @@ function getConversationRepository(event?: H3Event) {
       }
 
       const now = new Date().toISOString()
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('attachments')
-        .insert(rows.map((row) => ({
-          ...row,
-          user_id: userId,
-          created_at: now
-        })))
-        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at'))
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        const request = (client as any)
+          .from('attachments')
+          .insert(rows.map((row) => ({
+            message_id: row.message_id,
+            kind: row.kind,
+            original_name: row.original_name,
+            mime_type: row.mime_type,
+            size_bytes: row.size_bytes,
+            storage_path: row.storage_path,
+            gemini_file_name: row.gemini_file_name,
+            gemini_file_uri: row.gemini_file_uri,
+            ...(!legacySchema ? { user_id: userId, extracted_text: row.extracted_text } : {}),
+            created_at: now
+          })))
+          .select(getAttachmentSelect(legacySchema))
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -311,18 +483,32 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return (data ?? []) as AttachmentRow[]
+      const legacySchema = cachedConversationSchemaMode === 'legacy'
+
+      return ((data ?? []) as Array<Parameters<typeof normalizeAttachmentRow>[0]>)
+        .map((row) => normalizeAttachmentRow(row, legacySchema))
     },
     async updateAttachmentExtractedText(attachmentId: string, extractedText: string) {
-      const { error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('attachments')
-        .update({
-          extracted_text: extractedText
-        })
-        .eq('id', attachmentId)
-        .eq('user_id', userId))
+      const { error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('attachments')
+          .update({
+            extracted_text: extractedText
+          })
+          .eq('id', attachmentId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
+        if (isLegacyAttachmentExtractedTextError(error)) {
+          return
+        }
+
         throw createError({
           statusCode: 500,
           statusMessage: 'Failed to save attachment metadata.'
@@ -330,16 +516,24 @@ function getConversationRepository(event?: H3Event) {
       }
     },
     async updateConversation(conversationId: string, patch: Partial<ConversationRow>) {
-      const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('conversations')
-        .update({
-          ...patch,
-          updated_at: patch.updated_at ?? new Date().toISOString()
-        })
-        .eq('id', conversationId)
-        .eq('user_id', userId)
-        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
-        .single())
+      const { user_id: _ignoredUserId, ...safePatch } = patch
+      const { data, error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('conversations')
+          .update({
+            ...safePatch,
+            updated_at: patch.updated_at ?? new Date().toISOString()
+          })
+          .eq('id', conversationId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request
+          .select(getConversationSelect(legacySchema))
+          .single())
+      })
 
       if (error || !data) {
         throw createError({
@@ -348,14 +542,21 @@ function getConversationRepository(event?: H3Event) {
         })
       }
 
-      return data as ConversationRow
+      return data as unknown as ConversationRow
     },
     async deleteConversation(conversationId: string) {
-      const { error } = await measureRequestMetric(event, 'dbMs', async () => client
-        .from('conversations')
-        .delete()
-        .eq('id', conversationId)
-        .eq('user_id', userId))
+      const { error } = await runWithLegacySchemaFallback((legacySchema) => {
+        let request = client
+          .from('conversations')
+          .delete()
+          .eq('id', conversationId)
+
+        if (!legacySchema) {
+          request = request.eq('user_id', userId)
+        }
+
+        return measureRequestMetric(event, 'dbMs', async () => request)
+      })
 
       if (error) {
         throw createError({
@@ -374,6 +575,11 @@ export async function claimLegacyChatRecords(userId: string, event?: H3Event) {
   }))
 
   if (error) {
+    if (isMissingClaimLegacyRpcError(error)) {
+      markSchemaMode(true)
+      return
+    }
+
     throw createError({
       statusCode: 500,
       statusMessage: 'Failed to claim existing conversation history.'
