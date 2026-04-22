@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { lookup } from 'node:dns/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -98,7 +99,35 @@ function validateUrl(value, key) {
   }
 }
 
-function validateEnvironment(env) {
+function isReservedBenchmarkAddress(address) {
+  if (!address) {
+    return false
+  }
+
+  return address.startsWith('198.18.') || address.startsWith('198.19.')
+}
+
+async function validateSupabaseHostname(value) {
+  try {
+    const url = new URL(value)
+    const resolution = await lookup(url.hostname)
+
+    if (isReservedBenchmarkAddress(resolution.address)) {
+      return {
+        error: `SUPABASE_URL resolved to ${resolution.address}, which is a reserved benchmarking range and usually means the host is invalid or blackholed.`
+      }
+    }
+
+    return { warning: null, error: null }
+  }
+  catch (error) {
+    return {
+      error: `SUPABASE_URL host could not be resolved. Check that the Supabase project URL is still valid.`
+    }
+  }
+}
+
+async function validateEnvironment(env) {
   const errors = []
   const warnings = []
   const provider = normalizeProvider(env.AI_PROVIDER)
@@ -127,6 +156,13 @@ function validateEnvironment(env) {
 
     if (urlError) {
       errors.push(urlError)
+    }
+    else {
+      const dnsResult = await validateSupabaseHostname(env.SUPABASE_URL)
+
+      if (dnsResult.error) {
+        errors.push(dnsResult.error)
+      }
     }
   }
 
@@ -159,9 +195,9 @@ function validateEnvironment(env) {
   return { errors, warnings }
 }
 
-function main() {
+async function main() {
   const env = readEnvironment()
-  const { errors, warnings } = validateEnvironment(env)
+  const { errors, warnings } = await validateEnvironment(env)
 
   console.log('PolarGPT deployment readiness check')
   console.log('')
@@ -190,4 +226,4 @@ function main() {
   console.log('All required deployment settings are present.')
 }
 
-main()
+await main()

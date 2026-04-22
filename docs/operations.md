@@ -6,10 +6,12 @@
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
+- `npm run deploy:check` now also verifies that the configured `SUPABASE_URL` hostname resolves cleanly before release.
 
 ## Local Troubleshooting
 
 - If login or registration fails, verify `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, and that the Supabase Email provider is enabled.
+- If registration or login returns `Authentication service is temporarily unavailable.`, inspect Vercel runtime logs for DNS or TLS errors against the `SUPABASE_URL` host.
 - If conversation loading fails, check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 - If message generation fails, check `AI_PROVIDER`, the matching provider API key/model variables, and the server logs.
 - If attachments fail, verify the private bucket exists and the upload size stays within the configured limits.

@@ -29,6 +29,8 @@ npm run preview:doctor
 npm run deploy:check
 ```
 
+`npm run deploy:check` now validates both the env var format and that the configured `SUPABASE_URL` hostname still resolves.
+
 5. Run the local release checks:
 
 ```bash
