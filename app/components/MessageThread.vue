@@ -24,7 +24,7 @@ defineEmits<{
   openAttachment: [attachmentId: string]
 }>()
 
-const { formatDateTime, t, tEn } = useUiPreferences()
+const { formatDateTime, t } = useUiPreferences()
 const scroller = ref<HTMLElement | null>(null)
 
 function resolveMessageContent(message: DisplayMessage) {
@@ -60,21 +60,22 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
       {{ props.loadingOlder ? t('threadLoadOlderBusy') : t('threadLoadOlder') }}
     </button>
 
-    <div v-if="props.loading && props.messages.length === 0" class="thread__stage">
-      <p class="surface-label">{{ t('threadReadyLabel') }}</p>
-      <h3>{{ t('threadLoadingConversation') }}</h3>
+    <div v-if="props.loading && props.messages.length === 0" class="thread__stage thread__stage--loading">
+      <div class="thread__stage-shell">
+        <h3>{{ t('threadLoadingConversation') }}</h3>
+
+        <div class="thread__skeleton-list" aria-hidden="true">
+          <span v-for="index in 3" :key="index" class="thread__skeleton" />
+        </div>
+      </div>
     </div>
 
     <div v-else-if="props.messages.length === 0" class="thread__stage thread__stage--empty">
-      <div class="thread__stage-ghost" aria-hidden="true">
-        <span>{{ tEn('threadEmptyTitle') }}</span>
-      </div>
-
-      <div class="thread__stage-card">
-        <p class="surface-label">{{ t('threadReadyLabel') }}</p>
-        <h3>{{ tEn('threadEmptyTitle') }}</h3>
+      <div class="thread__stage-shell thread__stage-shell--empty">
+        <span class="thread__stage-mark" aria-hidden="true" />
+        <h3>{{ t('threadEmptyTitle') }}</h3>
         <p class="empty-copy">
-          {{ tEn('threadEmptyDescription') }}
+          {{ t('threadEmptyDescription') }}
         </p>
       </div>
     </div>
@@ -84,9 +85,13 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
       :key="message.id"
       :class="['thread__message', `thread__message--${message.role}`]"
     >
+      <div class="thread__avatar" aria-hidden="true">
+        <span>{{ message.role === 'assistant' ? 'AI' : t('threadRoleUser').slice(0, 1) }}</span>
+      </div>
+
       <div class="thread__bubble">
         <div class="thread__message-head">
-          <span class="surface-label">{{ message.role === 'assistant' ? t('threadRoleAssistant') : t('threadRoleUser') }}</span>
+          <span class="thread__role">{{ message.role === 'assistant' ? t('threadRoleAssistant') : t('threadRoleUser') }}</span>
           <span class="thread__timestamp">{{ formatDateTime(message.createdAt) }}</span>
         </div>
 
@@ -97,7 +102,7 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
             :is="attachment.downloadUrl ? 'a' : 'button'"
             v-for="attachment in message.attachments"
             :key="attachment.id"
-            class="thread__attachment"
+            :class="['thread__attachment', attachment.kind === 'image' && 'thread__attachment--image']"
             :href="attachment.downloadUrl ?? undefined"
             :target="attachment.downloadUrl ? '_blank' : undefined"
             :type="attachment.downloadUrl ? undefined : 'button'"
@@ -111,6 +116,7 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
               :alt="attachment.originalName"
               loading="lazy"
             >
+
             <div class="thread__attachment-meta">
               <strong>{{ attachment.originalName }}</strong>
               <span>{{ attachment.mimeType }} · {{ formatBytes(attachment.sizeBytes) }}</span>
@@ -123,8 +129,13 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
       </div>
     </article>
 
-    <div v-if="props.pending" class="thread__pending">
-      {{ t('threadGenerating') }}
+    <div v-if="props.pending" class="thread__pending" role="status" aria-live="polite">
+      <span class="thread__pending-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      <span>{{ t('threadGenerating') }}</span>
     </div>
   </section>
 </template>
@@ -134,182 +145,350 @@ watch(() => props.messages.length, async (nextLength, previousLength = 0) => {
   display: grid;
   gap: 18px;
   min-height: 0;
-  max-height: 100%;
+  height: 100%;
   overflow-y: auto;
-  width: min(100%, 980px);
-  margin: 0 auto;
-  padding: 4px 8px 14px;
+  width: 100%;
+  padding: 4px 2px 2px;
 }
 
 .thread__older {
   justify-self: center;
-  min-height: 36px;
+  min-height: 34px;
   padding-inline: 14px;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .thread__stage {
   display: grid;
-  gap: 14px;
-  place-content: center;
-  min-height: clamp(22rem, 44vh, 30rem);
-  text-align: left;
+  place-items: center;
+  min-height: 100%;
+  padding: clamp(18px, 3.2vw, 38px) clamp(8px, 1vw, 14px);
+}
+
+.thread__stage-shell {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 44rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.thread__stage-shell--empty {
+  justify-items: start;
+}
+
+.thread__stage-mark {
+  width: 32px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-signal) 100%);
+  box-shadow: none;
 }
 
 .thread__stage h3 {
   margin: 0;
-  font-size: clamp(1.45rem, 2.8vw, 2.4rem);
+  font-size: clamp(1.48rem, 2.9vw, 2.4rem);
   line-height: 1.04;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.05em;
 }
 
-.thread__stage--empty {
-  position: relative;
-  place-content: center start;
-}
-
-.thread__stage-card {
-  position: relative;
-  z-index: 1;
-  width: min(38rem, 100%);
+.thread__skeleton-list {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
-.thread__stage-ghost {
-  position: absolute;
-  inset: 50% auto auto 0;
-  transform: translateY(-50%);
-  max-width: 18ch;
-  font-size: clamp(3.6rem, 11vw, 7rem);
-  line-height: 0.9;
-  letter-spacing: -0.06em;
-  color: rgba(136, 149, 190, 0.12);
-  pointer-events: none;
+.thread__skeleton {
+  height: 12px;
+  border-radius: 999px;
+  border: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent),
+    color-mix(in srgb, var(--color-surface-soft) 88%, transparent);
+  background-size: 200% 100%;
+  animation: thread-shimmer 1.8s linear infinite;
 }
 
-html[data-theme='dark'] .thread__stage-ghost {
-  color: rgba(169, 184, 235, 0.08);
+.thread__skeleton:nth-child(1) {
+  width: min(100%, 15rem);
+}
+
+.thread__skeleton:nth-child(2) {
+  width: min(100%, 30rem);
+}
+
+.thread__skeleton:nth-child(3) {
+  width: min(100%, 22rem);
 }
 
 .thread__message {
-  display: flex;
-}
-
-.thread__message--assistant {
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
 }
 
 .thread__message--user {
-  justify-content: flex-end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.thread__message--user .thread__avatar {
+  order: 2;
+}
+
+.thread__message--user .thread__bubble {
+  justify-self: end;
+}
+
+.thread__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-soft) 72%, transparent);
+  color: var(--color-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+}
+
+html[data-theme='dark'] .thread__avatar {
+  background: color-mix(in srgb, var(--color-surface-strong) 72%, transparent);
+  border-color: color-mix(in srgb, var(--color-border-strong) 74%, transparent);
+}
+
+.thread__message--assistant .thread__avatar {
+  color: var(--color-signal);
+}
+
+.thread__message--user .thread__avatar {
+  color: var(--color-ink);
 }
 
 .thread__bubble {
   display: grid;
-  gap: 14px;
-  width: min(100%, 52rem);
-  padding: 18px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 26%),
-    var(--color-assistant);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(20px);
+  gap: 10px;
+  width: min(100%, 64rem);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .thread__message--user .thread__bubble {
-  width: min(100%, 22rem);
+  width: min(100%, 34rem);
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 96%, transparent);
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 28%),
-    var(--color-user);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 44%),
+    color-mix(in srgb, var(--color-user) 90%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 6px 16px rgba(92, 112, 153, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+html[data-theme='dark'] .thread__message--user .thread__bubble {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 42%),
+    color-mix(in srgb, var(--color-user) 94%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px rgba(0, 0, 0, 0.18);
 }
 
 .thread__message-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+}
+
+.thread__role {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .thread__timestamp {
   color: var(--color-muted);
-  font-size: 0.74rem;
-  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  opacity: 0.9;
 }
 
 .thread__content {
   margin: 0;
   white-space: pre-wrap;
-  line-height: 1.75;
+  word-break: break-word;
+  line-height: 1.78;
   font-family: var(--font-display);
-  font-size: 0.98rem;
+  font-size: 0.97rem;
+}
+
+.thread__message--assistant .thread__content {
+  font-size: 1rem;
 }
 
 .thread__attachments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  gap: 8px;
 }
 
 .thread__attachment {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
-  width: min(18rem, 100%);
-  padding: 12px;
+  width: min(100%, 24rem);
+  padding: 8px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-soft) 88%, transparent);
   text-align: left;
   color: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+html[data-theme='dark'] .thread__attachment {
+  background: color-mix(in srgb, var(--color-surface-strong) 84%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.thread__attachment:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-surface-strong) 72%, transparent);
+}
+
+html[data-theme='dark'] .thread__attachment:hover {
+  background: color-mix(in srgb, var(--color-surface-strong) 96%, transparent);
+}
+
+.thread__attachment--image {
+  width: min(100%, 26rem);
 }
 
 .thread__preview {
-  width: 100%;
-  aspect-ratio: 4 / 3;
+  width: 46px;
+  height: 46px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: 10px;
 }
 
 .thread__attachment-meta {
   display: grid;
-  gap: 6px;
+  gap: 3px;
+  min-width: 0;
+}
+
+.thread__attachment-meta:only-child {
+  grid-column: 1 / -1;
 }
 
 .thread__attachment-meta strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.84rem;
 }
 
 .thread__attachment-meta span {
   color: var(--color-muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 .thread__pending {
   justify-self: start;
-  padding: 12px 16px;
-  border-radius: 999px;
-  background: var(--color-surface-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-muted);
-  border: 1px solid var(--color-border);
+  border: 0;
+}
+
+.thread__pending-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.thread__pending-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-signal);
+  animation: thread-bounce 1.2s infinite ease-in-out;
+}
+
+.thread__pending-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thread__pending-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thread-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes thread-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 900px) {
-  .thread {
-    width: 100%;
-    padding-inline: 0;
+  .thread__message,
+  .thread__message--user {
+    grid-template-columns: 1fr;
   }
 
-  .thread__stage-ghost {
-    font-size: clamp(2.6rem, 14vw, 4.4rem);
+  .thread__message--user .thread__avatar {
+    order: 0;
+  }
+
+  .thread__avatar {
+    display: none;
   }
 
   .thread__bubble,
   .thread__message--user .thread__bubble {
     width: 100%;
+  }
+
+  .thread__message--user .thread__bubble {
+    padding: 12px 14px;
   }
 }
 </style>

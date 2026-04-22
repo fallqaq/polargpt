@@ -8,14 +8,14 @@ export interface RequestMetrics {
   totalMs: number
   dbMs: number
   storageMs: number
-  geminiMs: number
+  modelMs: number
   signUrlMs: number
   responseBytes: number
   messageCount: number
   attachmentCount: number
 }
 
-type DurationMetricKey = 'dbMs' | 'storageMs' | 'geminiMs' | 'signUrlMs'
+type DurationMetricKey = 'dbMs' | 'storageMs' | 'modelMs' | 'signUrlMs'
 type CountMetricKey = 'messageCount' | 'attachmentCount'
 
 function now() {
@@ -38,7 +38,7 @@ export function initializeRequestMetrics(event: H3Event) {
     totalMs: 0,
     dbMs: 0,
     storageMs: 0,
-    geminiMs: 0,
+    modelMs: 0,
     signUrlMs: 0,
     responseBytes: 0,
     messageCount: 0,

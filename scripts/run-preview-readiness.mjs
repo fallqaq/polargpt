@@ -38,7 +38,7 @@ function runStep(step) {
 }
 
 function main() {
-  console.log('polarGPT preview readiness check')
+  console.log('PolarGPT preview readiness check')
 
   for (const step of steps) {
     runStep(step)

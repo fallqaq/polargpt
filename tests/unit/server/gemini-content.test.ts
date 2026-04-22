@@ -23,6 +23,7 @@ describe('Gemini content builder', () => {
             storage_path: 'conversation-1/msg-user/notes.pdf',
             gemini_file_name: 'files/abc',
             gemini_file_uri: 'https://generativelanguage.googleapis.com/file/abc',
+            extracted_text: null,
             created_at: '2026-03-20T00:00:00.000Z'
           }
         ]

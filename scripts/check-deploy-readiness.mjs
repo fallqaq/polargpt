@@ -4,17 +4,21 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const REQUIRED_KEYS = [
-  'ADMIN_PASSWORD_HASH',
   'SESSION_SECRET',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_ANON_KEY',
-  'GEMINI_API_KEY',
   'APP_BASE_URL'
 ]
 
 const OPTIONAL_DEFAULTS = {
+  AI_PROVIDER: 'deepseek',
+  DEEPSEEK_MODEL: 'deepseek-chat',
   GEMINI_MODEL: 'gemini-2.5-flash'
+}
+
+function normalizeProvider(value) {
+  return value === 'gemini' ? 'gemini' : OPTIONAL_DEFAULTS.AI_PROVIDER
 }
 
 function printUsage() {
@@ -97,6 +101,7 @@ function validateUrl(value, key) {
 function validateEnvironment(env) {
   const errors = []
   const warnings = []
+  const provider = normalizeProvider(env.AI_PROVIDER)
 
   for (const key of REQUIRED_KEYS) {
     if (!env[key]) {
@@ -104,8 +109,13 @@ function validateEnvironment(env) {
     }
   }
 
-  if (env.ADMIN_PASSWORD_HASH && !/^\$2[aby]\$\d{2}\$/.test(env.ADMIN_PASSWORD_HASH)) {
-    errors.push('ADMIN_PASSWORD_HASH must be a bcrypt hash. Generate one with `npm run hash:admin -- "password"`.')
+  if (provider === 'gemini') {
+    if (!env.GEMINI_API_KEY) {
+      errors.push('Missing required variable: GEMINI_API_KEY')
+    }
+  }
+  else if (!env.DEEPSEEK_API_KEY) {
+    errors.push('Missing required variable: DEEPSEEK_API_KEY')
   }
 
   if (env.SESSION_SECRET && env.SESSION_SECRET.length < 32) {
@@ -128,8 +138,16 @@ function validateEnvironment(env) {
     }
   }
 
-  if (!env.GEMINI_MODEL) {
+  if (!env.AI_PROVIDER) {
+    warnings.push(`AI_PROVIDER is not set. The app will default to ${OPTIONAL_DEFAULTS.AI_PROVIDER}.`)
+  }
+
+  if (provider === 'gemini' && !env.GEMINI_MODEL) {
     warnings.push(`GEMINI_MODEL is not set. The app will default to ${OPTIONAL_DEFAULTS.GEMINI_MODEL}.`)
+  }
+
+  if (provider === 'deepseek' && !env.DEEPSEEK_MODEL) {
+    warnings.push(`DEEPSEEK_MODEL is not set. The app will default to ${OPTIONAL_DEFAULTS.DEEPSEEK_MODEL}.`)
   }
 
   const nodeMajor = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10)
@@ -145,7 +163,7 @@ function main() {
   const env = readEnvironment()
   const { errors, warnings } = validateEnvironment(env)
 
-  console.log('polarGPT deployment readiness check')
+  console.log('PolarGPT deployment readiness check')
   console.log('')
 
   if (warnings.length > 0) {

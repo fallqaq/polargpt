@@ -1,13 +1,16 @@
 import { createError } from 'h3'
+import { normalizeModelProvider, type ModelProvider } from '#shared/constants/polargpt'
 
 export interface PolarServerRuntimeConfig {
-  adminPasswordHash: string
   sessionSecret: string
   supabaseUrl: string
   supabaseServiceRoleKey: string
   supabaseAnonKey: string
+  aiProvider: ModelProvider
   geminiApiKey: string
   geminiModel: string
+  deepseekApiKey: string
+  deepseekModel: string
   appBaseUrl: string
 }
 
@@ -19,13 +22,15 @@ export function getServerRuntimeConfig(): PolarServerRuntimeConfig {
   const runtimeConfig = useRuntimeConfig()
 
   return {
-    adminPasswordHash: getProcessEnvValue(runtimeConfig.adminPasswordHash, 'ADMIN_PASSWORD_HASH'),
     sessionSecret: getProcessEnvValue(runtimeConfig.sessionSecret, 'SESSION_SECRET'),
     supabaseUrl: getProcessEnvValue(runtimeConfig.supabaseUrl, 'SUPABASE_URL'),
     supabaseServiceRoleKey: getProcessEnvValue(runtimeConfig.supabaseServiceRoleKey, 'SUPABASE_SERVICE_ROLE_KEY'),
     supabaseAnonKey: getProcessEnvValue(runtimeConfig.supabaseAnonKey, 'SUPABASE_ANON_KEY'),
+    aiProvider: normalizeModelProvider(getProcessEnvValue(runtimeConfig.aiProvider, 'AI_PROVIDER')),
     geminiApiKey: getProcessEnvValue(runtimeConfig.geminiApiKey, 'GEMINI_API_KEY'),
     geminiModel: getProcessEnvValue(runtimeConfig.geminiModel, 'GEMINI_MODEL'),
+    deepseekApiKey: getProcessEnvValue(runtimeConfig.deepseekApiKey, 'DEEPSEEK_API_KEY'),
+    deepseekModel: getProcessEnvValue(runtimeConfig.deepseekModel, 'DEEPSEEK_MODEL'),
     appBaseUrl: getProcessEnvValue(runtimeConfig.appBaseUrl, 'APP_BASE_URL', 'http://localhost:3000')
   }
 }

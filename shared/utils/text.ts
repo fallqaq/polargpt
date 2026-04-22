@@ -15,7 +15,7 @@ export function truncateText(value: string, maxLength: number) {
 }
 
 /**
- * The first user prompt sets the initial title unless the administrator edits
+ * The first user prompt sets the initial title unless the signed-in user edits
  * it later. The title stays deterministic so it can be regenerated in tests.
  */
 export function buildConversationTitle(source: string | null | undefined) {

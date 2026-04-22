@@ -2,19 +2,25 @@
  * Shared constants are kept here so client and server code validate against the
  * same attachment and session rules.
  */
-export const APP_NAME = 'polarGPT'
+export const APP_NAME = 'PolarGPT'
 export const DEFAULT_CONVERSATION_TITLE = 'New conversation'
+export const DEFAULT_AI_PROVIDER = 'deepseek'
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat'
 export const ATTACHMENT_BUCKET = 'chat-attachments'
 export const MAX_ATTACHMENTS_PER_MESSAGE = 4
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
-export const ADMIN_SESSION_COOKIE_NAME = 'polargpt_admin_session'
-export const ADMIN_HINT_COOKIE_NAME = 'polargpt_admin_hint'
-export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
+export const AUTH_PASSWORD_MIN_LENGTH = 6
+export const DEEPSEEK_MAX_DOCUMENT_CHARS = 30_000
+export const DEEPSEEK_MAX_TOTAL_DOCUMENT_CHARS = 120_000
+export const USER_SESSION_COOKIE_NAME = 'polargpt_user_session'
+export const USER_HINT_COOKIE_NAME = 'polargpt_user_hint'
+export const USER_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 export const SIGNED_ATTACHMENT_URL_TTL_SECONDS = 60 * 5
 export const DEFAULT_MESSAGES_PAGE_LIMIT = 50
 
+export type ModelProvider = 'gemini' | 'deepseek'
 export type SupportedAttachmentKind = 'image' | 'document'
 
 export interface AttachmentRule {
@@ -69,11 +75,6 @@ export const ATTACHMENT_RULES: AttachmentRule[] = [
   }
 ]
 
-export const ACCEPT_ATTRIBUTE = [
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  '.pdf',
-  '.txt',
-  '.md'
-].join(',')
+export function normalizeModelProvider(value?: string | null): ModelProvider {
+  return value === 'gemini' ? 'gemini' : DEFAULT_AI_PROVIDER
+}

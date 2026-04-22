@@ -1,9 +1,15 @@
 import { getRequestURL, sendRedirect } from 'h3'
-import { getAdminSession } from '../services/auth-service'
+import { getUserSession } from '../services/auth-service'
 
 export default defineEventHandler((event) => {
-  const pathname = getRequestURL(event).pathname
-  const hasSession = Boolean(getAdminSession(event))
+  const url = getRequestURL(event)
+  const pathname = url.pathname
+  const previewMode = process.env.NODE_ENV !== 'production' && url.searchParams.get('preview') === '1'
+  const hasSession = Boolean(getUserSession(event))
+
+  if (previewMode) {
+    return
+  }
 
   if (pathname === '/login' && hasSession) {
     return sendRedirect(event, '/chat')

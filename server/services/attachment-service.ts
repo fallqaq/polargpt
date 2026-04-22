@@ -13,6 +13,8 @@ import type { AttachmentInsertRow, AttachmentRow } from '../types/database'
 import { getSupabaseAdminClient } from '../utils/supabase-admin'
 import { reportServerError } from '../utils/logger'
 import { measureRequestMetric } from '../utils/request-metrics'
+import { extractDocumentText } from '../utils/document-extractor'
+import { getCurrentModelProvider } from './ai-service'
 import { deleteGeminiFile, uploadGeminiFile } from './gemini-service'
 
 export interface MultipartAttachmentPart {
@@ -31,6 +33,7 @@ export interface ValidatedAttachmentUpload {
 }
 
 export function validateAttachmentParts(parts: MultipartAttachmentPart[]) {
+  const provider = getCurrentModelProvider()
   const countError = enforceAttachmentCount(parts.length)
 
   if (countError) {
@@ -54,7 +57,7 @@ export function validateAttachmentParts(parts: MultipartAttachmentPart[]) {
       fileName,
       mimeType: part.type,
       sizeBytes: part.data.byteLength
-    })
+    }, provider)
 
     if (!validation.valid || !validation.rule) {
       throw createError({
@@ -80,6 +83,40 @@ export function validateAttachmentParts(parts: MultipartAttachmentPart[]) {
       kind: validation.rule.kind
     } satisfies ValidatedAttachmentUpload
   })
+}
+
+async function prepareAttachmentForProvider(input: {
+  attachment: ValidatedAttachmentUpload
+  event?: H3Event
+}) {
+  const provider = getCurrentModelProvider()
+
+  if (provider === 'gemini') {
+    const geminiFile = await uploadGeminiFile({
+      buffer: input.attachment.buffer,
+      mimeType: input.attachment.mimeType,
+      fileName: input.attachment.fileName,
+      event: input.event
+    })
+
+    return {
+      geminiFileName: geminiFile.name ?? null,
+      geminiFileUri: geminiFile.uri ?? null,
+      extractedText: null
+    }
+  }
+
+  const extractedText = await extractDocumentText({
+    buffer: input.attachment.buffer,
+    fileName: input.attachment.fileName,
+    mimeType: input.attachment.mimeType
+  })
+
+  return {
+    geminiFileName: null,
+    geminiFileUri: null,
+    extractedText
+  }
 }
 
 function buildStoragePath(conversationId: string, messageId: string, fileName: string) {
@@ -123,17 +160,15 @@ export async function uploadMessageAttachments(input: {
   try {
     await runWithConcurrencyLimit(input.attachments, 2, async (attachment, index) => {
       const storagePath = buildStoragePath(input.conversationId, input.messageId, attachment.fileName)
-      const [uploadResult, geminiFile] = await Promise.all([
+      const [uploadResult, providerAttachment] = await Promise.all([
         measureRequestMetric(input.event, 'storageMs', async () => client.storage
           .from(ATTACHMENT_BUCKET)
           .upload(storagePath, attachment.buffer, {
             contentType: attachment.mimeType,
             upsert: false
           })),
-        uploadGeminiFile({
-          buffer: attachment.buffer,
-          mimeType: attachment.mimeType,
-          fileName: attachment.fileName,
+        prepareAttachmentForProvider({
+          attachment,
           event: input.event
         })
       ])
@@ -147,8 +182,8 @@ export async function uploadMessageAttachments(input: {
 
       uploadedStoragePaths.push(storagePath)
 
-      if (geminiFile.name) {
-        uploadedGeminiFiles.push(geminiFile.name)
+      if (providerAttachment.geminiFileName) {
+        uploadedGeminiFiles.push(providerAttachment.geminiFileName)
       }
 
       createdRows[index] = {
@@ -158,8 +193,9 @@ export async function uploadMessageAttachments(input: {
         mime_type: attachment.mimeType,
         size_bytes: attachment.sizeBytes,
         storage_path: storagePath,
-        gemini_file_name: geminiFile.name ?? null,
-        gemini_file_uri: geminiFile.uri ?? null
+        gemini_file_name: providerAttachment.geminiFileName,
+        gemini_file_uri: providerAttachment.geminiFileUri,
+        extracted_text: providerAttachment.extractedText
       }
     })
   }

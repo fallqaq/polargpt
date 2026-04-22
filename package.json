@@ -19,14 +19,15 @@
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "test": "vitest run --coverage",
-    "test:watch": "vitest",
-    "hash:admin": "node scripts/hash-admin-password.mjs"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@google/genai": "^1.46.0",
     "@supabase/supabase-js": "^2.99.3",
     "bcryptjs": "^3.0.3",
     "nuxt": "^4.4.2",
+    "openai": "^6.34.0",
+    "unpdf": "^1.6.0",
     "vue": "^3.5.30",
     "vue-router": "^5.0.3",
     "zod": "^4.3.6"

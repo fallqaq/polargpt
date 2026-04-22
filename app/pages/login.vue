@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ADMIN_HINT_COOKIE_NAME } from '#shared/constants/polargpt'
-import type { LoginResponse } from '#shared/types/chat'
+import { USER_HINT_COOKIE_NAME } from '#shared/constants/polargpt'
+import type { AuthResponse } from '#shared/types/chat'
 import { getRequestErrorMessage } from '../utils/request-errors'
 
 interface Particle {
@@ -15,53 +15,78 @@ interface Particle {
   hue: number
 }
 
+type AuthMode = 'login' | 'register'
+
 definePageMeta({
   middleware: ['guest-only']
 })
 
+const mode = ref<AuthMode>('login')
+const email = ref('')
 const password = ref('')
-const pending = ref(false)
+const pendingMode = ref<AuthMode | null>(null)
 const errorMessage = ref<string | null>(null)
-const adminHintCookie = useCookie<string | null>(ADMIN_HINT_COOKIE_NAME)
-const { locale, t, tEn } = useUiPreferences()
+const userHintCookie = useCookie<string | null>(USER_HINT_COOKIE_NAME)
+const { locale, t } = useUiPreferences()
 const scene = ref<HTMLElement | null>(null)
 const particles = ref<Particle[]>([])
 const pointerX = ref(0.52)
 const pointerY = ref(0.38)
-const pointerActive = ref(false)
 const prefersReducedMotion = ref(false)
+const isRegisterMode = computed(() => mode.value === 'register')
+const pending = computed(() => pendingMode.value !== null)
+const cardTitle = computed(() => isRegisterMode.value ? t('loginRegisterTitle') : t('loginSignInTitle'))
+const submitLabel = computed(() => {
+  if (pending.value) {
+    return t('loginSubmitBusy')
+  }
+
+  return isRegisterMode.value ? t('loginSubmitRegisterIdle') : t('loginSubmitLoginIdle')
+})
 
 let animationFrameId = 0
 let particleId = 0
 
+function switchMode(nextMode: AuthMode) {
+  mode.value = nextMode
+  errorMessage.value = null
+}
+
 async function submit() {
-  if (!password.value.trim()) {
-    errorMessage.value = t('loginPasswordRequired')
+  if (!email.value.trim()) {
+    errorMessage.value = t('errorEmailRequired')
     return
   }
 
-  pending.value = true
+  if (!password.value.trim()) {
+    errorMessage.value = t('errorPasswordRequired')
+    return
+  }
+
+  const action = mode.value
+  pendingMode.value = action
   errorMessage.value = null
 
   try {
-    await $fetch<LoginResponse>('/api/admin/session/login', {
+    await $fetch<AuthResponse>(action === 'register' ? '/api/auth/register' : '/api/auth/login', {
       method: 'POST',
       body: {
+        email: email.value,
         password: password.value
       }
     })
 
-    adminHintCookie.value = '1'
+    userHintCookie.value = '1'
     await navigateTo('/chat')
   }
   catch (error) {
     errorMessage.value = getRequestErrorMessage(error, {
       locale: locale.value,
-      fallbackKey: 'errorLoginFailed'
+      fallbackKey: action === 'register' ? 'errorRegisterFailed' : 'errorLoginFailed'
     })
   }
   finally {
-    pending.value = false
+    pendingMode.value = null
   }
 }
 
@@ -106,7 +131,7 @@ function emitParticles(clientX: number, clientY: number) {
   const localY = clientY - rect.top
 
   particles.value = [
-    ...particles.value.slice(-18),
+    ...particles.value.slice(-14),
     {
       id: particleId++,
       x: localX + (Math.random() - 0.5) * 12,
@@ -116,7 +141,7 @@ function emitParticles(clientX: number, clientY: number) {
       size: 18 + Math.random() * 26,
       life: 1,
       decay: 0.03 + Math.random() * 0.02,
-      hue: Math.random() > 0.5 ? 224 : 334
+      hue: Math.random() > 0.5 ? 214 : 190
     }
   ]
 
@@ -131,12 +156,10 @@ function handlePointerMove(event: PointerEvent) {
   const rect = scene.value.getBoundingClientRect()
   pointerX.value = clamp((event.clientX - rect.left) / rect.width, 0, 1)
   pointerY.value = clamp((event.clientY - rect.top) / rect.height, 0, 1)
-  pointerActive.value = true
   emitParticles(event.clientX, event.clientY)
 }
 
 function handlePointerLeave() {
-  pointerActive.value = false
   pointerX.value = 0.52
   pointerY.value = 0.38
 }
@@ -153,16 +176,6 @@ function particleStyle(particle: Particle) {
   }
 }
 
-const sceneStyle = computed(() => ({
-  '--pointer-x': `${pointerX.value * 100}%`,
-  '--pointer-y': `${pointerY.value * 100}%`,
-  '--pointer-shift-x': `${(pointerX.value - 0.5) * 44}px`,
-  '--pointer-shift-y': `${(pointerY.value - 0.5) * 34}px`,
-  '--pointer-shift-x-reverse': `${(0.5 - pointerX.value) * 28}px`,
-  '--pointer-shift-y-reverse': `${(0.5 - pointerY.value) * 22}px`,
-  '--pointer-opacity': pointerActive.value ? '1' : '0.74'
-}))
-
 const cardStyle = computed(() => {
   if (prefersReducedMotion.value) {
     return {
@@ -170,8 +183,8 @@ const cardStyle = computed(() => {
     }
   }
 
-  const rotateX = (0.5 - pointerY.value) * 7
-  const rotateY = (pointerX.value - 0.5) * 9
+  const rotateX = (0.5 - pointerY.value) * 5
+  const rotateY = (pointerX.value - 0.5) * 6
 
   return {
     transform: `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`
@@ -193,15 +206,10 @@ onBeforeUnmount(() => {
   <section
     ref="scene"
     class="login"
-    :style="sceneStyle"
     @pointermove="handlePointerMove"
     @pointerleave="handlePointerLeave"
   >
     <div class="login__backdrop" aria-hidden="true">
-      <div class="login__halo login__halo--primary" />
-      <div class="login__halo login__halo--secondary" />
-      <div class="login__halo login__halo--ambient" />
-
       <span
         v-for="particle in particles"
         :key="particle.id"
@@ -211,19 +219,46 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="login__hero">
-      <p class="surface-label">{{ t('loginModeLabel') }}</p>
-      <span class="login__ghost-copy" aria-hidden="true">{{ tEn('loginTitle') }}</span>
-      <h1>{{ tEn('loginTitle') }}</h1>
-      <p>
-        {{ t('loginDescription') }}
-      </p>
+      <h1>{{ t('loginTitle') }}</h1>
+      <p class="login__tagline">{{ t('loginDescription') }}</p>
     </div>
 
     <form class="login__card panel" :style="cardStyle" @submit.prevent="submit">
       <div class="login__card-head">
-        <p class="surface-label">{{ t('loginAccessLabel') }}</p>
-        <h2>{{ t('loginSignInTitle') }}</h2>
+        <h2>{{ cardTitle }}</h2>
       </div>
+
+      <div class="login__mode-switch" role="tablist" :aria-label="t('loginAccessLabel')">
+        <button
+          class="login__mode-button"
+          :class="{ 'is-active': !isRegisterMode }"
+          type="button"
+          @click="switchMode('login')"
+        >
+          {{ t('authModeSignIn') }}
+        </button>
+
+        <button
+          class="login__mode-button"
+          :class="{ 'is-active': isRegisterMode }"
+          type="button"
+          @click="switchMode('register')"
+        >
+          {{ t('authModeRegister') }}
+        </button>
+      </div>
+
+      <label class="login__field">
+        <span>{{ t('loginEmailLabel') }}</span>
+        <input
+          v-model="email"
+          class="text-input"
+          type="email"
+          :placeholder="t('loginEmailPlaceholder')"
+          autocomplete="email"
+          inputmode="email"
+        >
+      </label>
 
       <label class="login__field">
         <span>{{ t('loginPasswordLabel') }}</span>
@@ -232,7 +267,7 @@ onBeforeUnmount(() => {
           class="text-input"
           type="password"
           :placeholder="t('loginPasswordPlaceholder')"
-          autocomplete="current-password"
+          :autocomplete="isRegisterMode ? 'new-password' : 'current-password'"
         >
       </label>
 
@@ -241,8 +276,19 @@ onBeforeUnmount(() => {
       </p>
 
       <button class="button login__submit" type="submit" :disabled="pending">
-        {{ pending ? t('loginSubmitBusy') : t('loginSubmitIdle') }}
+        {{ submitLabel }}
       </button>
+
+      <p class="login__switch-copy">
+        {{ isRegisterMode ? t('loginTogglePromptSignIn') : t('loginTogglePromptRegister') }}
+        <button
+          class="login__inline-link"
+          type="button"
+          @click="switchMode(isRegisterMode ? 'login' : 'register')"
+        >
+          {{ isRegisterMode ? t('loginToggleActionSignIn') : t('loginToggleActionRegister') }}
+        </button>
+      </p>
     </form>
   </section>
 </template>
@@ -268,41 +314,6 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.login__halo {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(26px);
-  opacity: var(--pointer-opacity);
-  transition: transform 180ms ease, opacity 180ms ease;
-}
-
-.login__halo--primary {
-  top: 8%;
-  left: calc(var(--pointer-x) - 11rem);
-  width: 22rem;
-  height: 22rem;
-  background: radial-gradient(circle, rgba(133, 152, 255, 0.42), transparent 66%);
-  transform: translate3d(var(--pointer-shift-x), var(--pointer-shift-y), 0);
-}
-
-.login__halo--secondary {
-  right: 12%;
-  bottom: 6%;
-  width: 24rem;
-  height: 24rem;
-  background: radial-gradient(circle, rgba(255, 176, 209, 0.24), transparent 68%);
-  transform: translate3d(var(--pointer-shift-x-reverse), var(--pointer-shift-y-reverse), 0);
-}
-
-.login__halo--ambient {
-  top: calc(var(--pointer-y) - 4rem);
-  left: calc(var(--pointer-x) - 4rem);
-  width: 8rem;
-  height: 8rem;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.48), transparent 72%);
-  transform: translate3d(var(--pointer-shift-x), var(--pointer-shift-y), 0);
-}
-
 .login__particle {
   position: absolute;
   border-radius: 999px;
@@ -318,51 +329,35 @@ onBeforeUnmount(() => {
 
 .login__hero {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   align-content: center;
   min-height: 34rem;
-}
-
-.login__ghost-copy {
-  position: absolute;
-  top: 2.6rem;
-  left: 0;
-  max-width: 8ch;
-  font-size: clamp(4rem, 10vw, 7.2rem);
-  line-height: 0.9;
-  letter-spacing: -0.08em;
-  color: rgba(137, 149, 188, 0.12);
-  pointer-events: none;
-}
-
-html[data-theme='dark'] .login__ghost-copy {
-  color: rgba(191, 202, 241, 0.08);
+  max-width: 34rem;
 }
 
 .login__hero h1 {
-  position: relative;
-  margin: 8px 0 0;
+  margin: 0;
   max-width: 8ch;
-  font-size: clamp(3.2rem, 8vw, 5.8rem);
-  line-height: 0.88;
-  letter-spacing: -0.06em;
+  font-size: clamp(3.2rem, 8vw, 5.2rem);
+  line-height: 0.92;
+  letter-spacing: -0.07em;
 }
 
-.login__hero p:last-child {
+.login__tagline {
   margin: 0;
-  max-width: 40rem;
+  max-width: 28rem;
   color: var(--color-muted);
   line-height: 1.8;
-  font-size: 1rem;
+  font-size: 1.04rem;
+  letter-spacing: 0.01em;
 }
 
 .login__card {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   padding: clamp(22px, 3vw, 32px);
-  border-radius: 32px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 28%),
     var(--color-panel-strong);
   box-shadow: var(--shadow-floating);
   transform-style: preserve-3d;
@@ -370,14 +365,57 @@ html[data-theme='dark'] .login__ghost-copy {
   will-change: transform;
 }
 
+html[data-theme='dark'] .login__particle {
+  opacity: 0.56;
+}
+
+html[data-theme='dark'] .login__card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
+    color-mix(in srgb, var(--color-panel-solid) 88%, transparent);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+}
+
 .login__card-head {
   display: grid;
+  gap: 6px;
+}
+
+.login__mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.login__mode-button {
+  min-height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+html[data-theme='dark'] .login__mode-button {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.login__mode-button.is-active {
+  border-color: color-mix(in srgb, var(--color-signal) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-signal) 14%, transparent);
+  color: var(--color-ink);
+}
+
+html[data-theme='dark'] .login__mode-button.is-active {
+  border-color: color-mix(in srgb, var(--color-signal) 26%, var(--color-border));
+  background: color-mix(in srgb, var(--color-signal) 10%, transparent);
 }
 
 .login__card h2 {
   margin: 0;
-  font-size: 1.65rem;
+  font-size: 1.5rem;
   letter-spacing: -0.03em;
 }
 
@@ -395,6 +433,25 @@ html[data-theme='dark'] .login__ghost-copy {
   width: 100%;
 }
 
+.login__switch-copy {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.login__inline-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-signal);
+  font: inherit;
+  cursor: pointer;
+}
+
+html[data-theme='dark'] .login__inline-link {
+  color: color-mix(in srgb, var(--color-signal) 86%, white 14%);
+}
+
 @media (max-width: 960px) {
   .login {
     grid-template-columns: 1fr;
@@ -405,6 +462,10 @@ html[data-theme='dark'] .login__ghost-copy {
   .login__hero {
     min-height: auto;
     padding-top: 12px;
+  }
+
+  .login__hero h1 {
+    max-width: none;
   }
 
   .login__card {

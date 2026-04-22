@@ -32,14 +32,29 @@ function normalizeMessagesPageLimit(limit?: number | null) {
   return Math.min(Math.max(Math.trunc(limit), 1), MAX_MESSAGES_PAGE_LIMIT)
 }
 
+function requireAuthenticatedUserId(event?: H3Event) {
+  const userId = event?.context.userSession?.userId
+
+  if (!userId) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Authentication is required.'
+    })
+  }
+
+  return userId
+}
+
 function getConversationRepository(event?: H3Event) {
   const client = getSupabaseAdminClient()
+  const userId = requireAuthenticatedUserId(event)
 
   return {
     async listConversations(searchQuery?: string) {
       let request = client
         .from('conversations')
-        .select('id, title, summary, created_at, updated_at, last_message_at')
+        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
+        .eq('user_id', userId)
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .order('updated_at', { ascending: false })
 
@@ -67,13 +82,14 @@ function getConversationRepository(event?: H3Event) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('conversations')
         .insert({
+          user_id: userId,
           title: DEFAULT_CONVERSATION_TITLE,
           summary: '',
           created_at: now,
           updated_at: now,
           last_message_at: null
         })
-        .select('id, title, summary, created_at, updated_at, last_message_at')
+        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
         .single())
 
       if (error || !data) {
@@ -88,8 +104,9 @@ function getConversationRepository(event?: H3Event) {
     async getConversation(conversationId: string) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('conversations')
-        .select('id, title, summary, created_at, updated_at, last_message_at')
+        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
         .eq('id', conversationId)
+        .eq('user_id', userId)
         .maybeSingle())
 
       if (error) {
@@ -104,8 +121,9 @@ function getConversationRepository(event?: H3Event) {
     async getMessage(messageId: string) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('messages')
-        .select('id, conversation_id, role, content, model, status, created_at')
+        .select('id, user_id, conversation_id, role, content, model, status, created_at')
         .eq('id', messageId)
+        .eq('user_id', userId)
         .maybeSingle())
 
       if (error) {
@@ -120,8 +138,9 @@ function getConversationRepository(event?: H3Event) {
     async listMessages(conversationId: string) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('messages')
-        .select('id, conversation_id, role, content, model, status, created_at')
+        .select('id, user_id, conversation_id, role, content, model, status, created_at')
         .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: true }))
 
       if (error) {
@@ -155,8 +174,9 @@ function getConversationRepository(event?: H3Event) {
 
       let request = client
         .from('messages')
-        .select('id, conversation_id, role, content, model, status, created_at')
+        .select('id, user_id, conversation_id, role, content, model, status, created_at')
         .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit + 1)
 
@@ -190,7 +210,8 @@ function getConversationRepository(event?: H3Event) {
 
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('attachments')
-        .select('id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, created_at')
+        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at')
+        .eq('user_id', userId)
         .in('message_id', messageIds)
         .order('created_at', { ascending: true }))
 
@@ -210,7 +231,8 @@ function getConversationRepository(event?: H3Event) {
 
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('attachments')
-        .select('id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, created_at')
+        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at')
+        .eq('user_id', userId)
         .in('id', attachmentIds))
 
       if (error) {
@@ -233,6 +255,7 @@ function getConversationRepository(event?: H3Event) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('messages')
         .insert({
+          user_id: userId,
           conversation_id: input.conversationId,
           role: input.role,
           content: input.content,
@@ -240,7 +263,7 @@ function getConversationRepository(event?: H3Event) {
           status: input.status,
           created_at: now
         })
-        .select('id, conversation_id, role, content, model, status, created_at')
+        .select('id, user_id, conversation_id, role, content, model, status, created_at')
         .single())
 
       if (error || !data) {
@@ -256,7 +279,8 @@ function getConversationRepository(event?: H3Event) {
       const { error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('messages')
         .delete()
-        .eq('id', messageId))
+        .eq('id', messageId)
+        .eq('user_id', userId))
 
       if (error) {
         throw createError({
@@ -275,9 +299,10 @@ function getConversationRepository(event?: H3Event) {
         .from('attachments')
         .insert(rows.map((row) => ({
           ...row,
+          user_id: userId,
           created_at: now
         })))
-        .select('id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, created_at'))
+        .select('id, user_id, message_id, kind, original_name, mime_type, size_bytes, storage_path, gemini_file_name, gemini_file_uri, extracted_text, created_at'))
 
       if (error) {
         throw createError({
@@ -288,6 +313,22 @@ function getConversationRepository(event?: H3Event) {
 
       return (data ?? []) as AttachmentRow[]
     },
+    async updateAttachmentExtractedText(attachmentId: string, extractedText: string) {
+      const { error } = await measureRequestMetric(event, 'dbMs', async () => client
+        .from('attachments')
+        .update({
+          extracted_text: extractedText
+        })
+        .eq('id', attachmentId)
+        .eq('user_id', userId))
+
+      if (error) {
+        throw createError({
+          statusCode: 500,
+          statusMessage: 'Failed to save attachment metadata.'
+        })
+      }
+    },
     async updateConversation(conversationId: string, patch: Partial<ConversationRow>) {
       const { data, error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('conversations')
@@ -296,7 +337,8 @@ function getConversationRepository(event?: H3Event) {
           updated_at: patch.updated_at ?? new Date().toISOString()
         })
         .eq('id', conversationId)
-        .select('id, title, summary, created_at, updated_at, last_message_at')
+        .eq('user_id', userId)
+        .select('id, user_id, title, summary, created_at, updated_at, last_message_at')
         .single())
 
       if (error || !data) {
@@ -312,7 +354,8 @@ function getConversationRepository(event?: H3Event) {
       const { error } = await measureRequestMetric(event, 'dbMs', async () => client
         .from('conversations')
         .delete()
-        .eq('id', conversationId))
+        .eq('id', conversationId)
+        .eq('user_id', userId))
 
       if (error) {
         throw createError({
@@ -321,6 +364,20 @@ function getConversationRepository(event?: H3Event) {
         })
       }
     }
+  }
+}
+
+export async function claimLegacyChatRecords(userId: string, event?: H3Event) {
+  const client = getSupabaseAdminClient()
+  const { error } = await measureRequestMetric(event, 'dbMs', async () => client.rpc('claim_legacy_chat_records', {
+    claim_user_id: userId
+  }))
+
+  if (error) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to claim existing conversation history.'
+    })
   }
 }
 

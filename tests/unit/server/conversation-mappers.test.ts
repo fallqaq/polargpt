@@ -17,6 +17,7 @@ describe('conversation mappers', () => {
         storage_path: 'conversation-1/message-1/report.pdf',
         gemini_file_name: 'files/report',
         gemini_file_uri: 'https://example.com/files/report',
+        extracted_text: null,
         created_at: '2026-03-20T00:00:01.000Z'
       }
     ])

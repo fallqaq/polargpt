@@ -4,7 +4,7 @@
 
 - Frontend + server runtime: Vercel
 - Database + storage: Supabase
-- Model API: Gemini
+- Model API: DeepSeek by default, Gemini optional via `AI_PROVIDER=gemini`
 
 ## Environment Split
 
@@ -15,27 +15,21 @@
 ## Before You Deploy
 
 1. Install dependencies with `npm install`.
-2. Generate an admin password hash:
-
-```bash
-npm run hash:admin -- "your-admin-password"
-```
-
-3. Generate a session secret:
+2. Generate a session secret:
 
 ```bash
 npm run generate:session-secret
 ```
 
-4. Copy `.env.example` into `.env` and fill the values.
-5. Validate your local deployment settings:
+3. Copy `.env.example` into `.env` and fill the values.
+4. Validate your local deployment settings:
 
 ```bash
 npm run preview:doctor
 npm run deploy:check
 ```
 
-6. Run the local release checks:
+5. Run the local release checks:
 
 ```bash
 npm run preview:ready
@@ -53,14 +47,17 @@ If you prefer the long form, `npm run preview:ready` runs `deploy:check`, `typec
 
 ### Required Vercel Environment Variables
 
-- `ADMIN_PASSWORD_HASH`
 - `SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
+- `AI_PROVIDER`
 - `APP_BASE_URL`
+
+### Provider Environment Variables
+
+- If `AI_PROVIDER=deepseek`, set `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL`.
+- If `AI_PROVIDER=gemini`, set `GEMINI_API_KEY` and `GEMINI_MODEL`.
 
 ### `APP_BASE_URL` Rules
 
@@ -71,14 +68,15 @@ If you prefer the long form, `npm run preview:ready` runs `deploy:check`, `typec
 ## Supabase Setup
 
 1. Create a dev project and a prod project.
-2. Run the SQL migration in each project.
+2. Run the SQL migrations in each project.
 3. Confirm the `chat-attachments` bucket exists and remains private.
-4. Store `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel server environment variables only.
+4. Keep the Supabase Email provider enabled so password auth can work.
+5. Store `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel server environment variables only.
 
 ### Migration Options
 
 - Dashboard-first:
-  Open the SQL Editor in Supabase and run [`supabase/migrations/202603200001_polar_gpt_init.sql`](/Users/huangyiteng/Desktop/web-ai/supabase/migrations/202603200001_polar_gpt_init.sql).
+  Open the SQL Editor in Supabase and run [`supabase/migrations/202603200001_polar_gpt_init.sql`](/Users/huangyiteng/Desktop/web-ai/supabase/migrations/202603200001_polar_gpt_init.sql), [`supabase/migrations/202603210001_polar_gpt_conversation_search_indexes.sql`](/Users/huangyiteng/web-ai/supabase/migrations/202603210001_polar_gpt_conversation_search_indexes.sql), [`supabase/migrations/202604210001_add_attachment_extracted_text.sql`](/Users/huangyiteng/web-ai/supabase/migrations/202604210001_add_attachment_extracted_text.sql), and [`supabase/migrations/202604210002_polar_gpt_multi_user_auth.sql`](/Users/huangyiteng/web-ai/supabase/migrations/202604210002_polar_gpt_multi_user_auth.sql).
 - CLI-first:
   Use `npx supabase login`, `npx supabase link`, then `npx supabase db push`.
 
@@ -106,7 +104,7 @@ If you prefer the long form, `npm run preview:ready` runs `deploy:check`, `typec
 ```json
 {
   "ok": true,
-  "app": "polarGPT",
+  "app": "PolarGPT",
   "environment": "production",
   "timestamp": "2026-03-20T00:00:00.000Z"
 }

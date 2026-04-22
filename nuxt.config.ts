@@ -1,4 +1,8 @@
-import { DEFAULT_GEMINI_MODEL } from './shared/constants/polargpt'
+import {
+  DEFAULT_AI_PROVIDER,
+  DEFAULT_DEEPSEEK_MODEL,
+  DEFAULT_GEMINI_MODEL
+} from './shared/constants/polargpt'
 
 /**
  * Accept both Nuxt-style `NUXT_*` variables and the plain project-level names
@@ -15,25 +19,28 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   devtools: { enabled: process.env.NODE_ENV !== 'production' },
   runtimeConfig: {
-    adminPasswordHash: getEnvValue('NUXT_ADMIN_PASSWORD_HASH', 'ADMIN_PASSWORD_HASH'),
     sessionSecret: getEnvValue('NUXT_SESSION_SECRET', 'SESSION_SECRET'),
     supabaseUrl: getEnvValue('NUXT_SUPABASE_URL', 'SUPABASE_URL'),
     supabaseServiceRoleKey: getEnvValue('NUXT_SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_ROLE_KEY'),
     supabaseAnonKey: getEnvValue('NUXT_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY'),
+    aiProvider: getEnvValue('NUXT_AI_PROVIDER', 'AI_PROVIDER', DEFAULT_AI_PROVIDER),
     geminiApiKey: getEnvValue('NUXT_GEMINI_API_KEY', 'GEMINI_API_KEY'),
     geminiModel: getEnvValue('NUXT_GEMINI_MODEL', 'GEMINI_MODEL', DEFAULT_GEMINI_MODEL),
+    deepseekApiKey: getEnvValue('NUXT_DEEPSEEK_API_KEY', 'DEEPSEEK_API_KEY'),
+    deepseekModel: getEnvValue('NUXT_DEEPSEEK_MODEL', 'DEEPSEEK_MODEL', DEFAULT_DEEPSEEK_MODEL),
     appBaseUrl: getEnvValue('NUXT_APP_BASE_URL', 'APP_BASE_URL', 'http://localhost:3000'),
     public: {
-      appName: 'polarGPT'
+      appName: 'PolarGPT',
+      aiProvider: getEnvValue('NUXT_AI_PROVIDER', 'AI_PROVIDER', DEFAULT_AI_PROVIDER)
     }
   },
   app: {
     head: {
-      title: 'polarGPT',
+      title: 'PolarGPT',
       meta: [
         {
           name: 'description',
-          content: 'A focused single-admin AI chat console powered by Nuxt, Supabase, and Gemini.'
+          content: 'A focused multi-user AI chat console powered by Nuxt, Supabase, and configurable model providers.'
         },
         {
           name: 'viewport',

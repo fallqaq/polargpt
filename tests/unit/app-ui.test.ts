@@ -14,8 +14,8 @@ describe('app ui utilities', () => {
   })
 
   it('can force decorative copy to remain in English', () => {
-    expect(resolveEnglishUiText('loginTitle')).toBe('polarGPT control room')
-    expect(resolveEnglishUiText('threadEmptyTitle')).toBe('Start with a direct prompt or upload context first.')
+    expect(resolveEnglishUiText('loginTitle')).toBe('PolarGPT')
+    expect(resolveEnglishUiText('threadEmptyTitle')).toBe('Start with a clear question')
   })
 
   it('resolves the theme from the stored preference or system fallback', () => {
@@ -26,8 +26,14 @@ describe('app ui utilities', () => {
 
   it('translates known exact and pattern-based error messages', () => {
     expect(translateKnownErrorMessage('zh-CN', 'Conversation not found.')).toBe('未找到该会话。')
+    expect(translateKnownErrorMessage('zh-CN', 'Invalid email or password.')).toBe('邮箱或密码错误。')
+    expect(translateKnownErrorMessage('zh-CN', 'An account with this email already exists.')).toBe('该邮箱已注册。')
+    expect(translateKnownErrorMessage('zh-CN', 'Password must be at least 6 characters.')).toBe('密码至少需要 6 个字符。')
     expect(translateKnownErrorMessage('zh-CN', 'report.pdf exceeds the size limit of 20 MB.')).toBe(
       'report.pdf 超过大小限制 20 MB。'
+    )
+    expect(translateKnownErrorMessage('zh-CN', 'Images are not supported with the current AI provider. Use PDF, TXT, or Markdown files instead.')).toBe(
+      '当前 AI provider 不支持图片。请改用 PDF、TXT 或 Markdown 文件。'
     )
   })
 

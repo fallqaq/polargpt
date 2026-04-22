@@ -5,6 +5,7 @@ import type { AttachmentRow, ConversationRow, MessageRow } from '#server/types/d
 function createConversationRow(): ConversationRow {
   return {
     id: 'conversation-1',
+    user_id: 'user-1',
     title: 'New conversation',
     summary: '',
     created_at: '2026-03-20T00:00:00.000Z',
@@ -16,6 +17,7 @@ function createConversationRow(): ConversationRow {
 function createUserMessage(): MessageRow {
   return {
     id: 'message-user',
+    user_id: 'user-1',
     conversation_id: 'conversation-1',
     role: 'user',
     content: 'Summarize this report',
@@ -28,6 +30,7 @@ function createUserMessage(): MessageRow {
 function createAssistantMessage(): MessageRow {
   return {
     id: 'message-assistant',
+    user_id: 'user-1',
     conversation_id: 'conversation-1',
     role: 'assistant',
     content: 'The report focuses on deployment, storage policies, and admin access.',
@@ -40,6 +43,7 @@ function createAssistantMessage(): MessageRow {
 function createAttachmentRow(): AttachmentRow {
   return {
     id: 'attachment-1',
+    user_id: 'user-1',
     message_id: 'message-user',
     kind: 'document',
     original_name: 'report.pdf',
@@ -48,6 +52,7 @@ function createAttachmentRow(): AttachmentRow {
     storage_path: 'conversation-1/message-user/report.pdf',
     gemini_file_name: 'files/report',
     gemini_file_uri: 'https://example.com/files/report',
+    extracted_text: null,
     created_at: '2026-03-20T00:01:01.000Z'
   }
 }
@@ -85,7 +90,8 @@ describe('message service integration', () => {
           size_bytes: 1024,
           storage_path: 'conversation-1/message-user/report.pdf',
           gemini_file_name: 'files/report',
-          gemini_file_uri: 'https://example.com/files/report'
+          gemini_file_uri: 'https://example.com/files/report',
+          extracted_text: null
         }
       ]),
       generateAssistantReply: vi.fn().mockResolvedValue({

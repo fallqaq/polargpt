@@ -10,7 +10,7 @@ import type {
   ConversationSummaryResponse,
   SendMessageDeltaResponse
 } from '#shared/types/chat'
-import { DEFAULT_MESSAGES_PAGE_LIMIT, ADMIN_HINT_COOKIE_NAME } from '#shared/constants/polargpt'
+import { DEFAULT_MESSAGES_PAGE_LIMIT, USER_HINT_COOKIE_NAME } from '#shared/constants/polargpt'
 import { FetchError } from 'ofetch'
 import { getRequestErrorMessage } from '../utils/request-errors'
 
@@ -53,11 +53,48 @@ function markPerformance(name: string) {
   performance.mark(name)
 }
 
+function buildPreviewConversation(input: {
+  id: string
+  title: string
+  summary: string
+  createdAt: string
+  updatedAt: string
+  lastMessageAt: string | null
+}): ConversationSummary {
+  return {
+    id: input.id,
+    title: input.title,
+    summary: input.summary,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    lastMessageAt: input.lastMessageAt
+  }
+}
+
+function buildPreviewMessage(input: {
+  id: string
+  conversationId: string
+  role: ChatMessage['role']
+  content: string
+  createdAt: string
+}): ChatMessage {
+  return {
+    id: input.id,
+    conversationId: input.conversationId,
+    role: input.role,
+    content: input.content,
+    model: 'preview',
+    status: 'completed',
+    createdAt: input.createdAt,
+    attachments: []
+  }
+}
+
 export function usePolarGptChat() {
   const route = useRoute()
   const router = useRouter()
   const { locale } = useUiPreferences()
-  const adminHintCookie = useCookie<string | null>(ADMIN_HINT_COOKIE_NAME)
+  const userHintCookie = useCookie<string | null>(USER_HINT_COOKIE_NAME)
   const conversationsById = useState<Record<string, ConversationSummary>>('polargpt-conversations-by-id', () => ({}))
   const conversationOrder = useState<string[]>('polargpt-conversation-order', () => [])
   const messagesByConversationId = useState<Record<string, StoredConversationMessages>>('polargpt-messages-by-conversation-id', () => ({}))
@@ -72,6 +109,7 @@ export function usePolarGptChat() {
   const errorMessage = useState<string | null>('polargpt-error-message', () => null)
   const attachmentUrls = useState<Record<string, string | null>>('polargpt-attachment-urls', () => ({}))
   const attachmentUrlPending = useState<Record<string, boolean>>('polargpt-attachment-url-pending', () => ({}))
+  const previewMode = computed(() => import.meta.dev && route.query.preview === '1')
 
   let listAbortController: AbortController | null = null
   let conversationAbortController: AbortController | null = null
@@ -84,7 +122,7 @@ export function usePolarGptChat() {
     }
     catch (error) {
       if (error instanceof FetchError && error.status === 401) {
-        adminHintCookie.value = null
+        userHintCookie.value = null
         await navigateTo('/login')
       }
 
@@ -99,6 +137,153 @@ export function usePolarGptChat() {
 
   function clearError() {
     errorMessage.value = null
+  }
+
+  function createPreviewSeed() {
+    const now = Date.now()
+    const latest = new Date(now - 4 * 60_000).toISOString()
+    const earlier = new Date(now - 58 * 60_000).toISOString()
+    const first = new Date(now - 65 * 60_000).toISOString()
+    const second = new Date(now - 18 * 60_000).toISOString()
+    const third = new Date(now - 7 * 60_000).toISOString()
+
+    const conversations = [
+      buildPreviewConversation({
+        id: 'preview-workspace',
+        title: locale.value === 'zh-CN' ? '产品首页视觉方向' : 'Homepage visual direction',
+        summary: locale.value === 'zh-CN'
+          ? '收敛视觉元素，突出产品信息层级和品牌气质。'
+          : 'Reduce visual noise and sharpen hierarchy for a more premium feel.',
+        createdAt: earlier,
+        updatedAt: latest,
+        lastMessageAt: latest
+      }),
+      buildPreviewConversation({
+        id: 'preview-notes',
+        title: locale.value === 'zh-CN' ? '移动端对话体验' : 'Mobile chat experience',
+        summary: locale.value === 'zh-CN'
+          ? '简化顶部结构，扩大消息阅读区，减少装饰性文案。'
+          : 'Simplify the top chrome, enlarge the reading area, and trim decorative copy.',
+        createdAt: first,
+        updatedAt: second,
+        lastMessageAt: second
+      })
+    ]
+
+    const messages: Record<string, StoredConversationMessages> = {
+      'preview-workspace': {
+        messageIds: [
+          'preview-message-1',
+          'preview-message-2',
+          'preview-message-3'
+        ],
+        messagesById: {
+          'preview-message-1': buildPreviewMessage({
+            id: 'preview-message-1',
+            conversationId: 'preview-workspace',
+            role: 'user',
+            content: locale.value === 'zh-CN'
+              ? '我想把聊天页改得更克制，少一点装饰，多一点高级感。'
+              : 'I want the chat page to feel more restrained and premium.',
+            createdAt: earlier
+          }),
+          'preview-message-2': buildPreviewMessage({
+            id: 'preview-message-2',
+            conversationId: 'preview-workspace',
+            role: 'assistant',
+            content: locale.value === 'zh-CN'
+              ? '可以先收窄侧栏、压缩头部高度，并把顶部切换条改成更轻的浮层工具条。'
+              : 'Start by narrowing the sidebar, compressing the header, and turning the switches into a lighter floating toolbar.',
+            createdAt: second
+          }),
+          'preview-message-3': buildPreviewMessage({
+            id: 'preview-message-3',
+            conversationId: 'preview-workspace',
+            role: 'assistant',
+            content: locale.value === 'zh-CN'
+              ? '这一版预览会保留毛玻璃气质，但把圆角、阴影和背景光效都收一档。'
+              : 'This preview keeps the glass feel, but pulls back the radius, shadows, and background glow.',
+            createdAt: third
+          })
+        },
+        nextCursor: null,
+        limit: DEFAULT_MESSAGES_PAGE_LIMIT,
+        ready: true
+      },
+      'preview-notes': {
+        messageIds: [
+          'preview-message-4',
+          'preview-message-5'
+        ],
+        messagesById: {
+          'preview-message-4': buildPreviewMessage({
+            id: 'preview-message-4',
+            conversationId: 'preview-notes',
+            role: 'user',
+            content: locale.value === 'zh-CN'
+              ? '移动端不要看起来像后台管理页。'
+              : 'The mobile view should not feel like an admin panel.',
+            createdAt: first
+          }),
+          'preview-message-5': buildPreviewMessage({
+            id: 'preview-message-5',
+            conversationId: 'preview-notes',
+            role: 'assistant',
+            content: locale.value === 'zh-CN'
+              ? '消息区优先，工具条和侧栏都要让位给内容。'
+              : 'The message area should take priority over the toolbar and sidebar.',
+            createdAt: second
+          })
+        },
+        nextCursor: null,
+        limit: DEFAULT_MESSAGES_PAGE_LIMIT,
+        ready: true
+      }
+    }
+
+    return {
+      conversations,
+      messages
+    }
+  }
+
+  function seedPreviewState(force = false) {
+    if (!force && Object.keys(conversationsById.value).some((id) => id.startsWith('preview-'))) {
+      return
+    }
+
+    const seed = createPreviewSeed()
+    conversationsById.value = Object.fromEntries(seed.conversations.map((conversation) => [conversation.id, conversation]))
+    messagesByConversationId.value = seed.messages
+    conversationOrder.value = seed.conversations.map((conversation) => conversation.id)
+
+    const requestedConversationId = typeof route.query.conversation === 'string'
+      ? route.query.conversation
+      : null
+
+    currentConversationId.value = requestedConversationId && seed.messages[requestedConversationId]
+      ? requestedConversationId
+      : seed.conversations[0]?.id ?? null
+  }
+
+  function getPreviewConversations(query = searchQuery.value) {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return Object.values(conversationsById.value)
+      .filter((conversation) => conversation.id.startsWith('preview-'))
+      .filter((conversation) => {
+        if (!normalizedQuery) {
+          return true
+        }
+
+        return conversation.title.toLowerCase().includes(normalizedQuery)
+          || conversation.summary.toLowerCase().includes(normalizedQuery)
+      })
+      .sort((left, right) => {
+        const leftValue = left.lastMessageAt ?? left.updatedAt
+        const rightValue = right.lastMessageAt ?? right.updatedAt
+        return rightValue.localeCompare(leftValue)
+      })
   }
 
   function matchesCurrentSearch(conversation: ConversationSummary) {
@@ -264,6 +449,14 @@ export function usePolarGptChat() {
   }
 
   async function refreshConversations(query = searchQuery.value) {
+    if (previewMode.value) {
+      seedPreviewState()
+      clearError()
+      listPending.value = false
+      conversationOrder.value = getPreviewConversations(query).map((conversation) => conversation.id)
+      return
+    }
+
     listPending.value = true
     clearError()
     const requestVersion = ++listRequestVersion
@@ -306,6 +499,27 @@ export function usePolarGptChat() {
   }
 
   async function openConversation(conversationId: string, options: { updateRoute?: boolean, force?: boolean } = {}) {
+    if (previewMode.value) {
+      seedPreviewState()
+      currentConversationId.value = conversationId
+
+      if (!getMessageState(conversationId).ready) {
+        getMessageState(conversationId).ready = true
+      }
+
+      if (options.updateRoute !== false) {
+        await router.replace({
+          query: {
+            ...route.query,
+            conversation: conversationId
+          }
+        })
+      }
+
+      conversationPending.value = false
+      return
+    }
+
     currentConversationId.value = conversationId
 
     if (options.updateRoute !== false) {
@@ -364,6 +578,10 @@ export function usePolarGptChat() {
   }
 
   async function loadOlderMessages() {
+    if (previewMode.value) {
+      return
+    }
+
     const conversationId = currentConversationId.value
 
     if (!conversationId) {
@@ -405,6 +623,36 @@ export function usePolarGptChat() {
   }
 
   async function createConversation(options: { open?: boolean } = {}) {
+    if (previewMode.value) {
+      seedPreviewState()
+      clearError()
+      const timestamp = new Date().toISOString()
+      const conversation = buildPreviewConversation({
+        id: `preview-${Date.now()}`,
+        title: locale.value === 'zh-CN' ? '新的对话' : 'New chat',
+        summary: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastMessageAt: null
+      })
+
+      conversationsById.value[conversation.id] = conversation
+      messagesByConversationId.value[conversation.id] = createEmptyMessageState()
+      conversationOrder.value = [conversation.id, ...conversationOrder.value.filter((id) => id !== conversation.id)]
+
+      if (options.open !== false) {
+        currentConversationId.value = conversation.id
+        await router.replace({
+          query: {
+            ...route.query,
+            conversation: conversation.id
+          }
+        })
+      }
+
+      return conversation
+    }
+
     clearError()
 
     try {
@@ -446,6 +694,22 @@ export function usePolarGptChat() {
   }
 
   async function renameConversation(conversationId: string, title: string) {
+    if (previewMode.value) {
+      seedPreviewState()
+      const conversation = conversationsById.value[conversationId]
+
+      if (!conversation) {
+        return
+      }
+
+      conversationsById.value[conversationId] = {
+        ...conversation,
+        title,
+        updatedAt: new Date().toISOString()
+      }
+      return
+    }
+
     clearError()
 
     try {
@@ -466,6 +730,24 @@ export function usePolarGptChat() {
   }
 
   async function deleteConversation(conversationId: string) {
+    if (previewMode.value) {
+      seedPreviewState()
+      removeConversationState(conversationId)
+
+      if (currentConversationId.value === conversationId) {
+        const nextConversationId = conversationOrder.value[0] ?? null
+        currentConversationId.value = nextConversationId
+      }
+
+      await router.replace({
+        query: {
+          ...route.query,
+          conversation: currentConversationId.value ?? undefined
+        }
+      })
+      return
+    }
+
     clearError()
 
     try {
@@ -502,6 +784,69 @@ export function usePolarGptChat() {
   }
 
   async function sendMessage(input: { text: string, files: File[] }) {
+    if (previewMode.value) {
+      sendPending.value = true
+      clearError()
+
+      try {
+        const conversationId = await ensureConversationId()
+        const timestamp = new Date().toISOString()
+        const userAttachments = input.files.map((file, index) => ({
+          id: `preview-attachment-${Date.now()}-${index}`,
+          messageId: `preview-user-${Date.now()}`,
+          kind: file.type.startsWith('image/') ? 'image' : 'document',
+          originalName: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          createdAt: timestamp
+        } satisfies AttachmentRecord))
+
+        const userMessage: ChatMessage = {
+          id: `preview-user-${Date.now()}`,
+          conversationId,
+          role: 'user',
+          content: input.text.trim(),
+          model: null,
+          status: 'completed',
+          createdAt: timestamp,
+          attachments: userAttachments
+        }
+
+        const assistantMessage = buildPreviewMessage({
+          id: `preview-assistant-${Date.now()}`,
+          conversationId,
+          role: 'assistant',
+          content: locale.value === 'zh-CN'
+            ? '这是本地预览模式下的演示回复。当前机器连不上 Supabase，所以我先用本地假数据让你查看聊天界面和排版。'
+            : 'This is a demo reply from local preview mode. Supabase is unreachable on this machine, so the chat UI is being rendered with local mock data.',
+          createdAt: new Date(Date.now() + 300).toISOString()
+        })
+
+        appendMessages(conversationId, [userMessage, assistantMessage])
+
+        const previous = conversationsById.value[conversationId]
+        if (previous) {
+          const summarySource = input.text.trim() || previous.summary
+          conversationsById.value[conversationId] = {
+            ...previous,
+            summary: summarySource.slice(0, 72),
+            updatedAt: assistantMessage.createdAt,
+            lastMessageAt: assistantMessage.createdAt
+          }
+        }
+
+        conversationOrder.value = [
+          conversationId,
+          ...conversationOrder.value.filter((id) => id !== conversationId)
+        ]
+      }
+      finally {
+        sendPending.value = false
+      }
+
+      return
+    }
+
     sendPending.value = true
     clearError()
     markPerformance('polargpt-send-click')
@@ -584,6 +929,10 @@ export function usePolarGptChat() {
   }
 
   async function openAttachment(attachmentId: string) {
+    if (previewMode.value) {
+      return attachmentUrls.value[attachmentId] ?? null
+    }
+
     if (attachmentUrls.value[attachmentId]) {
       return attachmentUrls.value[attachmentId]
     }
@@ -593,14 +942,40 @@ export function usePolarGptChat() {
   }
 
   async function logout() {
-    await $fetch('/api/admin/session/logout', {
+    if (previewMode.value) {
+      userHintCookie.value = null
+      await navigateTo('/login?preview=1')
+      return
+    }
+
+    await $fetch('/api/auth/logout', {
       method: 'POST'
     })
-    adminHintCookie.value = null
+    userHintCookie.value = null
     await navigateTo('/login')
   }
 
   async function initialize() {
+    if (previewMode.value) {
+      if (initialized.value) {
+        return
+      }
+
+      initialized.value = true
+      seedPreviewState(true)
+      conversationOrder.value = getPreviewConversations().map((conversation) => conversation.id)
+
+      const requestedConversationId = typeof route.query.conversation === 'string'
+        ? route.query.conversation
+        : null
+
+      if (requestedConversationId && messagesByConversationId.value[requestedConversationId]) {
+        currentConversationId.value = requestedConversationId
+      }
+
+      return
+    }
+
     if (initialized.value) {
       return
     }

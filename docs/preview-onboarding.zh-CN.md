@@ -1,12 +1,12 @@
-# polarGPT Preview 新手部署指南
+# PolarGPT Preview 新手部署指南
 
-这份文档只做一件事：把 `polarGPT` 部署出一个可访问的 Preview 版本。
+这份文档只做一件事：把 `PolarGPT` 部署出一个可访问的 Preview 版本。
 
 适合你现在这种情况：
 
 - 已经有本地项目代码
 - 已经有 GitHub 账号
-- 已经有 Google AI API key
+- 已经有 DeepSeek 或 Gemini 的 API key
 - 还没有 Supabase 和 Vercel 账号
 - 想先练手，不急着上正式生产环境
 
@@ -31,26 +31,20 @@ npm run preview:doctor
 
 你至少要补齐这些值：
 
-- `ADMIN_PASSWORD_HASH`
 - `SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY`
+- `AI_PROVIDER`
+- `DEEPSEEK_API_KEY` 或 `GEMINI_API_KEY`
 
-### 2.1 生成管理员密码哈希
+### 2.1 选择 provider 并填入 API key
 
-```bash
-npm run hash:admin -- "你准备登录后台时要用的密码"
-```
+默认推荐保留 `AI_PROVIDER=deepseek`，然后把你的 DeepSeek key 粘贴到 [`.env`](/Users/huangyiteng/Desktop/web-ai/.env) 的 `DEEPSEEK_API_KEY=` 后面。
 
-把输出粘贴到 [`.env`](/Users/huangyiteng/Desktop/web-ai/.env) 的 `ADMIN_PASSWORD_HASH=` 后面。
+如果你要继续使用 Gemini，则把 `AI_PROVIDER=gemini`，并填写 `GEMINI_API_KEY=`。
 
-### 2.2 填入 Gemini API key
-
-把你已经有的 API key 粘贴到 [`.env`](/Users/huangyiteng/Desktop/web-ai/.env) 的 `GEMINI_API_KEY=` 后面。
-
-### 2.3 暂时保留这两个默认值
+### 2.2 暂时保留这两个默认值
 
 - `SESSION_SECRET`：项目已经生成好了
 - `APP_BASE_URL=http://localhost:3000`：本地开发先保持这样即可
@@ -151,13 +145,13 @@ npm run build
 
 在 Vercel 项目设置里，把下面这些变量添加到 Preview 环境：
 
-- `ADMIN_PASSWORD_HASH`
 - `SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL=gemini-2.5-flash`
+- `AI_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_MODEL=deepseek-chat`
 - `APP_BASE_URL=https://preview.example.com`
 
 第一次先用 `https://preview.example.com` 只是为了让配置完整。
@@ -194,14 +188,15 @@ https://<你的-preview-url>/api/health
 然后再做这几个页面级验证：
 
 1. 打开 `/login`
-2. 用你的管理员密码登录
-3. 新建一个会话
-4. 发一条纯文本消息
-5. 上传一张图片
-6. 上传一个 PDF 或 Markdown 文件
-7. 重命名会话
-8. 搜索会话
-9. 删除会话
+2. 用邮箱和密码注册一个新账号
+3. 退出后再用同一账号登录
+4. 新建一个会话
+5. 发一条纯文本消息
+6. 如果你当前用的是 Gemini，上传一张图片
+7. 上传一个 PDF 或 Markdown 文件
+8. 重命名会话
+9. 搜索会话
+10. 删除会话
 
 ## 第 10 步：如果出错，看哪里
 

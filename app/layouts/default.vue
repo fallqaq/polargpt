@@ -3,7 +3,6 @@
     <div class="shell__backdrop" aria-hidden="true">
       <div class="shell__mesh shell__mesh--warm" />
       <div class="shell__mesh shell__mesh--cool" />
-      <div class="shell__mesh shell__mesh--halo" />
       <div class="shell__veil" />
     </div>
     <main class="shell__viewport">
@@ -21,14 +20,15 @@
 .shell {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  isolation: isolate;
 }
 
 .shell__backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  z-index: 0;
 }
 
 .shell__viewport {
@@ -36,76 +36,90 @@
   z-index: 1;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 20px;
+  gap: 10px;
   min-height: 100vh;
-  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: clamp(10px, 1.5vw, 18px);
 }
 
 .shell__toolbar {
   display: flex;
   justify-content: flex-end;
-  padding-inline: clamp(4px, 1vw, 12px);
+  position: sticky;
+  top: 10px;
+  z-index: 3;
 }
 
 .shell__content {
   min-height: 0;
   display: grid;
-  padding-inline: clamp(4px, 1vw, 12px);
 }
 
 .shell__mesh {
   position: absolute;
-  width: 44rem;
-  height: 44rem;
+  width: 42rem;
+  height: 42rem;
   border-radius: 999px;
-  filter: blur(84px);
-  opacity: 0.8;
+  filter: blur(88px);
+  opacity: 0.62;
 }
 
 .shell__mesh--warm {
-  top: -14rem;
-  left: -10rem;
+  top: -16rem;
+  left: -12rem;
   background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.62), transparent 24%),
-    radial-gradient(circle, var(--color-glow-signal) 0%, transparent 66%);
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), transparent 24%),
+    radial-gradient(circle, var(--color-glow-signal) 0%, transparent 62%);
 }
 
 .shell__mesh--cool {
   right: -12rem;
   bottom: -16rem;
   background:
-    radial-gradient(circle at 42% 44%, rgba(255, 255, 255, 0.58), transparent 22%),
-    radial-gradient(circle, var(--color-glow-ice) 0%, transparent 64%);
-}
-
-.shell__mesh--halo {
-  top: 18%;
-  left: 46%;
-  width: 34rem;
-  height: 34rem;
-  background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.32), transparent 30%),
-    radial-gradient(circle, var(--color-glow-halo) 0%, transparent 72%);
-  transform: translateX(-50%);
+    radial-gradient(circle at 42% 44%, rgba(255, 255, 255, 0.34), transparent 22%),
+    radial-gradient(circle, var(--color-glow-ice) 0%, transparent 60%);
 }
 
 .shell__veil {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 20%),
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 28%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 22%),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%);
+}
+
+html[data-theme='dark'] .shell__mesh {
+  filter: blur(104px);
+  opacity: 0.42;
+}
+
+html[data-theme='dark'] .shell__mesh--warm {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.06), transparent 24%),
+    radial-gradient(circle, var(--color-glow-signal) 0%, transparent 68%);
+}
+
+html[data-theme='dark'] .shell__mesh--cool {
+  background:
+    radial-gradient(circle at 42% 44%, rgba(255, 255, 255, 0.04), transparent 22%),
+    radial-gradient(circle, var(--color-glow-ice) 0%, transparent 66%);
+}
+
+html[data-theme='dark'] .shell__veil {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
+    radial-gradient(circle at top, rgba(108, 130, 173, 0.08), transparent 30%);
 }
 
 @media (max-width: 768px) {
   .shell__viewport {
-    gap: 14px;
-    padding: 14px;
+    gap: 10px;
+    padding: 10px;
   }
 
-  .shell__content,
   .shell__toolbar {
-    padding-inline: 0;
+    justify-content: stretch;
   }
 }
 </style>

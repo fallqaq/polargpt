@@ -1,5 +1,6 @@
 import {
   ATTACHMENT_RULES,
+  type ModelProvider,
   MAX_ATTACHMENTS_PER_MESSAGE,
   type AttachmentRule,
   type SupportedAttachmentKind
@@ -43,13 +44,53 @@ export function findAttachmentRule(fileName: string, mimeType?: string | null) {
   })
 }
 
-export function validateAttachmentDescriptor(descriptor: AttachmentDescriptor): AttachmentValidationResult {
+export function isAttachmentRuleSupportedForProvider(rule: AttachmentRule, provider: ModelProvider) {
+  if (provider === 'gemini') {
+    return true
+  }
+
+  return rule.kind === 'document'
+}
+
+export function getSupportedAttachmentRules(provider: ModelProvider) {
+  return ATTACHMENT_RULES.filter((rule) => isAttachmentRuleSupportedForProvider(rule, provider))
+}
+
+export function getAllowedAttachmentFormatsLabel(provider: ModelProvider) {
+  return provider === 'gemini'
+    ? 'PNG, JPEG, WebP, PDF, TXT, and Markdown'
+    : 'PDF, TXT, and Markdown'
+}
+
+export function buildAcceptAttribute(provider: ModelProvider) {
+  return getSupportedAttachmentRules(provider)
+    .flatMap((rule) => {
+      const [primaryMimeType] = rule.mimeTypes
+      return primaryMimeType
+        ? [primaryMimeType, `.${rule.extension}`]
+        : [`.${rule.extension}`]
+    })
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(',')
+}
+
+export function validateAttachmentDescriptor(
+  descriptor: AttachmentDescriptor,
+  provider: ModelProvider = 'gemini'
+): AttachmentValidationResult {
   const rule = findAttachmentRule(descriptor.fileName, descriptor.mimeType)
 
   if (!rule) {
     return {
       valid: false,
-      reason: 'Unsupported file type. Allowed formats are PNG, JPEG, WebP, PDF, TXT, and Markdown.'
+      reason: `Unsupported file type. Allowed formats are ${getAllowedAttachmentFormatsLabel(provider)}.`
+    }
+  }
+
+  if (!isAttachmentRuleSupportedForProvider(rule, provider)) {
+    return {
+      valid: false,
+      reason: 'Images are not supported with the current AI provider. Use PDF, TXT, or Markdown files instead.'
     }
   }
 

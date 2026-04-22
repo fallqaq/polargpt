@@ -45,8 +45,18 @@ export interface AttachmentUrlRecord {
   downloadUrl: string | null
 }
 
-export interface LoginResponse {
+export interface AuthUser {
+  id: string
+  email: string
+}
+
+export interface AuthResponse {
   ok: true
+  user: AuthUser
+}
+
+export interface SessionResponse {
+  user: AuthUser | null
 }
 
 export interface ConversationListResponse {

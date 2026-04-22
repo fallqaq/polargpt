@@ -15,7 +15,7 @@ import {
 } from '../utils/conversation-mappers'
 import { getConversationDataAccess } from './conversation-service'
 import { uploadMessageAttachments, type ValidatedAttachmentUpload } from './attachment-service'
-import { generateAssistantReply } from './gemini-service'
+import { generateAssistantReply } from './ai-service'
 
 export interface MessageServiceDependencies {
   getConversation: (conversationId: string) => Promise<ConversationRow | null>
@@ -36,6 +36,7 @@ export interface MessageServiceDependencies {
     storage_path: string
     gemini_file_name: string | null
     gemini_file_uri: string | null
+    extracted_text: string | null
   }>) => Promise<AttachmentRow[]>
   listMessages: (conversationId: string) => Promise<MessageRow[]>
   listAttachmentsByMessageIds: (messageIds: string[]) => Promise<AttachmentRow[]>

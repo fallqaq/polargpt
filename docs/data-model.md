@@ -5,6 +5,7 @@
 ### `conversations`
 
 - `id`
+- `user_id`
 - `title`
 - `summary`
 - `created_at`
@@ -14,11 +15,13 @@
 Purpose:
 
 - Stores the sidebar-level representation of each chat.
+- Binds every conversation to exactly one authenticated user after the legacy claim step.
 - Keeps search-relevant summary text without indexing the full transcript in v1.
 
 ### `messages`
 
 - `id`
+- `user_id`
 - `conversation_id`
 - `role`
 - `content`
@@ -29,11 +32,13 @@ Purpose:
 Purpose:
 
 - Stores all user and assistant turns in chronological order.
+- Mirrors `user_id` so server-side ownership checks do not need cross-table joins.
 - Tracks the model used for assistant turns.
 
 ### `attachments`
 
 - `id`
+- `user_id`
 - `message_id`
 - `kind`
 - `original_name`
@@ -42,12 +47,14 @@ Purpose:
 - `storage_path`
 - `gemini_file_name`
 - `gemini_file_uri`
+- `extracted_text`
 - `created_at`
 
 Purpose:
 
 - Links uploaded files to a single message.
-- Stores both the Supabase storage reference and the Gemini file reference.
+- Mirrors `user_id` for direct ownership checks before URL signing or deletion.
+- Stores the Supabase storage reference, any Gemini file reference, and provider-neutral extracted document text for DeepSeek prompts.
 
 ## Storage
 
@@ -60,10 +67,16 @@ Purpose:
 
 - Conversation deletion is hard delete.
 - Foreign keys cascade from `conversations -> messages -> attachments`.
-- File objects and Gemini references are removed before the conversation row is deleted.
+- File objects and any Gemini references are removed before the conversation row is deleted.
 
 ## Search Strategy
 
 - Search uses `title` and `summary`.
 - No message full-text search in v1.
 - Summary is deterministic and generated from the latest user/assistant exchange.
+
+## Legacy Claim Rule
+
+- Rows created before multi-user support may temporarily have `user_id = null`.
+- The first successfully registered account claims those legacy rows through `claim_legacy_chat_records`.
+- After the claim, all new rows are created with a concrete `user_id`.

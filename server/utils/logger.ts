@@ -3,7 +3,7 @@
  * swapped to Sentry or another error sink without touching business handlers.
  */
 export function reportServerError(context: string, error: unknown, metadata?: Record<string, unknown>) {
-  console.error(`[polarGPT] ${context}`, {
+  console.error(`[PolarGPT] ${context}`, {
     error,
     metadata
   })

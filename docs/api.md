@@ -13,21 +13,22 @@ Example response:
 ```json
 {
   "ok": true,
-  "app": "polarGPT",
+  "app": "PolarGPT",
   "environment": "production",
   "timestamp": "2026-03-20T00:00:00.000Z"
 }
 ```
 
-## Session
+## Auth
 
-### `POST /api/admin/session/login`
+### `POST /api/auth/register`
 
 Request body:
 
 ```json
 {
-  "password": "admin-password"
+  "email": "person@example.com",
+  "password": "secret-123"
 }
 ```
 
@@ -35,11 +36,40 @@ Response:
 
 ```json
 {
-  "ok": true
+  "ok": true,
+  "user": {
+    "id": "user-id",
+    "email": "person@example.com"
+  }
 }
 ```
 
-### `POST /api/admin/session/logout`
+Registration immediately issues the app session cookie. No extra email verification step is required.
+
+### `POST /api/auth/login`
+
+Request body:
+
+```json
+{
+  "email": "person@example.com",
+  "password": "secret-123"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "user": {
+    "id": "user-id",
+    "email": "person@example.com"
+  }
+}
+```
+
+### `POST /api/auth/logout`
 
 Response:
 
@@ -53,11 +83,11 @@ Response:
 
 ### `GET /api/admin/conversations?q=`
 
-Returns the sidebar conversation list. Search only matches conversation `title` and `summary`.
+Returns the signed-in user's sidebar conversation list. Search only matches conversation `title` and `summary`.
 
 ### `POST /api/admin/conversations`
 
-Creates an empty conversation with the initial title `New conversation`.
+Creates an empty conversation for the signed-in user with the initial title `New conversation`.
 
 ### `GET /api/admin/conversations/:id?before=&limit=`
 
@@ -77,7 +107,7 @@ Request body:
 
 ### `DELETE /api/admin/conversations/:id`
 
-Hard-deletes the conversation, its messages, attachment metadata, Supabase objects, and Gemini file references.
+Hard-deletes the conversation, its messages, attachment metadata, Supabase objects, and any Gemini file references.
 
 ## Messages
 
@@ -94,8 +124,8 @@ Rules:
 
 - At least one of `text` or `files[]` must be provided
 - Maximum `4` attachments per message
-- Images up to `10MB`
-- Documents up to `20MB`
+- When `AI_PROVIDER=gemini`: images up to `10MB` and documents up to `20MB`
+- When `AI_PROVIDER=deepseek`: only `pdf`, `txt`, and `md` are accepted; document text is extracted on the server and long content is truncated before model submission
 
 Response:
 
@@ -119,6 +149,7 @@ Request body:
 ```
 
 Returns short-lived signed download URLs for the requested attachments only.
+Attachments outside the current user's scope resolve to `null`.
 
 ## Response Contracts
 

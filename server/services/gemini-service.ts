@@ -31,7 +31,7 @@ export async function uploadGeminiFile(input: {
 }) {
   const client = getGeminiClient()
 
-  return measureRequestMetric(input.event, 'geminiMs', async () => client.files.upload({
+  return measureRequestMetric(input.event, 'modelMs', async () => client.files.upload({
     file: new Blob([new Uint8Array(input.buffer)], {
       type: input.mimeType
     }),
@@ -59,12 +59,12 @@ export async function generateAssistantReply(input: {
   const config = getServerRuntimeConfig()
 
   try {
-    const response = await measureRequestMetric(input.event, 'geminiMs', async () => client.models.generateContent({
+    const response = await measureRequestMetric(input.event, 'modelMs', async () => client.models.generateContent({
       model: config.geminiModel || DEFAULT_GEMINI_MODEL,
       contents: buildGeminiContents(input.messages),
       config: {
         systemInstruction: [
-          'You are polarGPT, an internal assistant for a single administrator.',
+          'You are PolarGPT, an internal assistant for an authenticated user.',
           'Answer clearly, use the uploaded files when they are relevant, and do not mention hidden implementation details.',
           'If a document or image is unclear, say what is missing instead of fabricating content.'
         ].join(' ')

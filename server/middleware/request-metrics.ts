@@ -13,6 +13,6 @@ export default defineEventHandler((event) => {
       return
     }
 
-    console.info('[polarGPT] request.metrics', finalized)
+    console.info('[PolarGPT] request.metrics', finalized)
   })
 })
