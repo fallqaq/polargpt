@@ -62,6 +62,14 @@ const currentTheme = computed(() => theme.value)
 const themeToggleLabel = computed(() =>
   currentTheme.value === 'dark' ? t('toolbarThemeLight') : t('toolbarThemeDark'))
 
+function closeMenu() {
+  menuOpen.value = false
+}
+
+function toggleMenu() {
+  menuOpen.value = !menuOpen.value
+}
+
 function handleLocaleChange(event: Event) {
   const nextLocale = (event.target as HTMLSelectElement).value as UiLocale
   setLocale(nextLocale)
@@ -72,7 +80,7 @@ function toggleTheme() {
 }
 
 async function logout() {
-  menuOpen.value = false
+  closeMenu()
 
   if (previewMode.value) {
     userHintCookie.value = null
@@ -97,12 +105,12 @@ function handleDocumentClick(event: MouseEvent) {
 
   const target = event.target
   if (target instanceof Node && !menuRef.value.contains(target)) {
-    menuOpen.value = false
+    closeMenu()
   }
 }
 
 watch(() => route.fullPath, () => {
-  menuOpen.value = false
+  closeMenu()
 })
 
 onMounted(() => {
@@ -117,24 +125,29 @@ onBeforeUnmount(() => {
 <template>
   <div class="toolbar panel" role="toolbar" :aria-label="`${t('toolbarLanguage')} / ${t('toolbarTheme')}`">
     <div v-if="showAccount && displayUser" class="toolbar__leading">
-      <div ref="menuRef" class="toolbar__account">
+      <div
+        ref="menuRef"
+        class="toolbar__account"
+        @keydown.esc.stop.prevent="closeMenu"
+      >
         <button
           class="toolbar__account-button"
           type="button"
           :aria-expanded="menuOpen"
+          aria-haspopup="menu"
           :aria-label="displayUser.email"
-          @click="menuOpen = !menuOpen"
+          @click="toggleMenu"
         >
           <span class="toolbar__avatar">{{ userInitial }}</span>
         </button>
 
-        <div v-if="menuOpen" class="toolbar__menu">
+        <div v-if="menuOpen" class="toolbar__menu" role="menu">
           <div class="toolbar__menu-account">
             <p class="toolbar__menu-label">{{ t('toolbarCurrentAccount') }}</p>
             <p class="toolbar__menu-email">{{ displayUser.email }}</p>
           </div>
 
-          <button class="toolbar__menu-item" type="button" @click="logout">
+          <button class="toolbar__menu-item" type="button" role="menuitem" @click="logout">
             {{ t('headerLogout') }}
           </button>
         </div>
@@ -195,6 +208,7 @@ onBeforeUnmount(() => {
   width: auto;
   max-width: 100%;
   padding: 5px;
+  overflow: visible;
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 46%),
@@ -224,6 +238,7 @@ html[data-theme='dark'] .toolbar {
 
 .toolbar__account {
   position: relative;
+  z-index: 2;
 }
 
 .toolbar__account-button {
@@ -260,6 +275,7 @@ html[data-theme='dark'] .toolbar {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
+  z-index: 3;
   display: grid;
   gap: 4px;
   min-width: 15rem;
